@@ -25,7 +25,8 @@ export async function POST(request: Request) {
 
     if (!error) break
     if (error.code !== '23505') {
-      return Response.json({ error: 'Failed to create battle' }, { status: 500 })
+      console.error('Supabase insert error:', JSON.stringify(error))
+      return Response.json({ error: 'Failed to create battle', detail: error.message }, { status: 500 })
     }
 
     code = generateCode()
