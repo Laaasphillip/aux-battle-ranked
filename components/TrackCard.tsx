@@ -1,4 +1,4 @@
-import type { SpotifyTrack, BattleStatus } from '@/types'
+import type { SpotifyTrack } from '@/types'
 import Image from 'next/image'
 
 interface Props {
@@ -9,13 +9,12 @@ interface Props {
   onSetTrack: (url: string) => void
   loading: boolean
   disabled: boolean
-  status: BattleStatus
+  highlighted?: boolean
 }
 
-export default function TrackCard({ track, player, playerName, isMe, onSetTrack, loading, disabled, status }: Props) {
+export default function TrackCard({ track, player, playerName, isMe, onSetTrack, loading, disabled, highlighted }: Props) {
   const color = player === 1 ? '#3b82f6' : '#ef4444'
   const label = player === 1 ? 'P1' : 'P2'
-  const showEmbed = (status === 'live' || status === 'finished') && track
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -35,18 +34,14 @@ export default function TrackCard({ track, player, playerName, isMe, onSetTrack,
         <span className="font-bold text-sm truncate">{playerName ?? 'Waiting...'}</span>
       </div>
 
-      {showEmbed ? (
-        <iframe
-          src={`https://open.spotify.com/embed/track/${track.id}?utm_source=generator&theme=0`}
-          width="100%"
-          height="152"
-          style={{ border: 'none' }}
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          className="rounded-2xl"
-        />
-      ) : track ? (
-        <div className="bg-[#111] border border-[#222] rounded-2xl overflow-hidden">
+      {track ? (
+        <div
+          className="bg-[#111] border rounded-2xl overflow-hidden transition-all duration-500"
+          style={{
+            borderColor: highlighted ? color : '#222',
+            boxShadow: highlighted ? `0 0 28px ${color}50` : 'none',
+          }}
+        >
           {track.albumArt && (
             <div className="relative w-full aspect-square">
               <Image

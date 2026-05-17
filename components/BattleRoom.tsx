@@ -6,7 +6,10 @@ import type { Battle, SpotifyTrack } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import TrackCard from './TrackCard'
 import VoteBar from './VoteBar'
-import Timer from './Timer'
+
+const P1_END = 15
+const P2_END = 30
+const TOTAL = 40
 
 function getVoterId(): string {
   const key = 'auxbattle_voter_id'
@@ -25,17 +28,19 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const [joinName, setJoinName] = useState('')
   const [joining, setJoining] = useState(false)
   const [trackLoading, setTrackLoading] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  const [phase, setPhase] = useState<'p1' | 'p2' | 'vote' | null>(null)
+  const [audioReady, setAudioReady] = useState(false)
   const [hasVoted, setHasVoted] = useState(false)
   const [votedFor, setVotedFor] = useState<1 | 2 | null>(null)
   const [voteError, setVoteError] = useState('')
   const [copied, setCopied] = useState(false)
   const battleEndedRef = useRef(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     const role = localStorage.getItem(`auxbattle_role_${battle.code}`) as 'player1' | 'player2' | null
     if (role) setMyRole(role)
-
     const voted = localStorage.getItem(`auxbattle_voted_${battle.code}`)
     if (voted) {
       setHasVoted(true)
@@ -54,20 +59,20 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         (payload) => setBattle(payload.new as Battle)
       )
       .subscribe()
-
     return () => { client.removeChannel(channel) }
   }, [battle.code])
 
-  // Timer
+  // Timer + phase tracking
   useEffect(() => {
     if (battle.status !== 'live' || !battle.started_at) return
 
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - new Date(battle.started_at!).getTime()) / 1000)
-      const remaining = Math.max(0, battle.vote_duration - elapsed)
-      setTimeLeft(remaining)
+      const el = Math.floor((Date.now() - new Date(battle.started_at!).getTime()) / 1000)
+      setElapsed(el)
+      const newPhase: 'p1' | 'p2' | 'vote' = el < P1_END ? 'p1' : el < P2_END ? 'p2' : 'vote'
+      setPhase(prev => prev !== newPhase ? newPhase : prev)
 
-      if (remaining === 0 && !battleEndedRef.current) {
+      if (el >= battle.vote_duration && !battleEndedRef.current) {
         battleEndedRef.current = true
         fetch('/api/battle/end', {
           method: 'POST',
@@ -81,6 +86,44 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [battle.status, battle.started_at, battle.vote_duration, battle.code])
+
+  // Audio playback — fires only when phase boundary is crossed or audio is unlocked
+  useEffect(() => {
+    if (!audioReady || battle.status !== 'live' || !phase) return
+
+    audioRef.current?.pause()
+    audioRef.current = null
+
+    if (phase === 'vote') return
+
+    const track: SpotifyTrack | null =
+      phase === 'p1' ? initialBattle.player1_track : initialBattle.player2_track
+    if (!track?.previewUrl) return
+
+    const audio = new Audio(track.previewUrl)
+    audio.currentTime = (track.chorusStartMs ?? 0) / 1000
+    audio.volume = 0.85
+    audio.play().catch(() => {})
+    audioRef.current = audio
+
+    return () => { audio.pause() }
+  }, [phase, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop audio when battle ends
+  useEffect(() => {
+    if (battle.status === 'finished') {
+      audioRef.current?.pause()
+      audioRef.current = null
+    }
+  }, [battle.status])
+
+  function handleEnableAudio() {
+    const primer = new Audio()
+    primer.volume = 0
+    primer.play().catch(() => {})
+    primer.pause()
+    setAudioReady(true)
+  }
 
   const resolveTrack = useCallback(async (url: string): Promise<SpotifyTrack | null> => {
     setTrackLoading(true)
@@ -98,7 +141,6 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   async function handleSetTrack(url: string) {
     const track = await resolveTrack(url)
     if (!track) return
-
     const player = myRole === 'player1' ? 1 : 2
     await fetch('/api/battle/track', {
       method: 'POST',
@@ -110,13 +152,11 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   async function handleJoin() {
     if (!joinName.trim()) return
     setJoining(true)
-
     const res = await fetch('/api/battle/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: battle.code, playerName: joinName.trim() }),
     })
-
     if (res.ok) {
       localStorage.setItem(`auxbattle_role_${battle.code}`, 'player2')
       localStorage.setItem(`auxbattle_name_${battle.code}`, joinName.trim())
@@ -137,13 +177,11 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     if (hasVoted) return
     const voterId = getVoterId()
     setVoteError('')
-
     const res = await fetch('/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: battle.code, votedFor: player, voterId }),
     })
-
     if (res.ok) {
       setHasVoted(true)
       setVotedFor(player)
@@ -164,12 +202,36 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const totalVotes = battle.player1_votes + battle.player2_votes
   const winner =
     battle.status === 'finished'
-      ? battle.player1_votes > battle.player2_votes
-        ? 1
-        : battle.player2_votes > battle.player1_votes
-        ? 2
+      ? battle.player1_votes > battle.player2_votes ? 1
+        : battle.player2_votes > battle.player1_votes ? 2
         : 0
       : null
+
+  const phaseCountdown =
+    phase === 'p1' ? Math.max(0, P1_END - elapsed)
+    : phase === 'p2' ? Math.max(0, P2_END - elapsed)
+    : phase === 'vote' ? Math.max(0, TOTAL - elapsed)
+    : 0
+
+  const phaseElapsed =
+    phase === 'p1' ? elapsed
+    : phase === 'p2' ? elapsed - P1_END
+    : phase === 'vote' ? elapsed - P2_END
+    : 0
+
+  const phaseTotal = phase === 'vote' ? 10 : 15
+  const phasePct = Math.min(100, (phaseElapsed / phaseTotal) * 100)
+
+  const phaseColor =
+    phase === 'p1' ? '#3b82f6'
+    : phase === 'p2' ? '#ef4444'
+    : phase === 'vote' && phaseCountdown <= 3 ? '#ef4444'
+    : '#ffffff'
+
+  const activeTrackHasPreview =
+    phase === 'p1' ? !!battle.player1_track?.previewUrl
+    : phase === 'p2' ? !!battle.player2_track?.previewUrl
+    : true
 
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-8 max-w-2xl mx-auto">
@@ -192,6 +254,16 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         </div>
       </div>
 
+      {/* Enable audio banner */}
+      {!audioReady && battle.status !== 'finished' && (
+        <button
+          onClick={handleEnableAudio}
+          className="w-full mb-4 bg-[#111] border border-[#fbbf24]/40 rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-xs font-semibold text-[#fbbf24] hover:bg-[#1a1a1a] transition-colors"
+        >
+          <span>🔊</span> Tap to enable sound before the battle starts
+        </button>
+      )}
+
       {/* Status bar */}
       <div className="w-full mb-6">
         {battle.status === 'waiting' && (
@@ -204,20 +276,36 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
             Both tracks locked in
           </div>
         )}
-        {battle.status === 'live' && (
-          <div className="flex flex-col items-center gap-3 bg-[#111] border border-[#ef4444]/30 rounded-xl p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#ef4444]">Battle Live</p>
-            <Timer seconds={timeLeft} total={battle.vote_duration} />
+        {battle.status === 'live' && phase && (
+          <div
+            className="flex flex-col items-center gap-3 bg-[#111] rounded-xl p-4 border"
+            style={{ borderColor: `${phaseColor}40` }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: phaseColor }}>
+              {phase === 'p1' && `${battle.player1_name} is playing`}
+              {phase === 'p2' && `${battle.player2_name} is playing`}
+              {phase === 'vote' && 'Vote Now'}
+            </p>
+            {!activeTrackHasPreview && phase !== 'vote' && (
+              <p className="text-[10px] text-[#555]">preview unavailable for this track</p>
+            )}
+            <span className="text-5xl font-black tabular-nums" style={{ color: phaseColor }}>
+              {phaseCountdown}
+            </span>
+            <div className="w-full h-1.5 rounded-full bg-[#1a1a1a] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${phasePct}%`, background: phaseColor }}
+              />
+            </div>
           </div>
         )}
         {battle.status === 'finished' && (
           <div className="bg-[#111] border border-[#fbbf24]/30 rounded-xl px-4 py-4 text-center">
             <p className="text-xs text-[#666] uppercase tracking-widest mb-1">Winner</p>
             <p className="text-2xl font-black">
-              {winner === 0
-                ? "It's a Tie!"
-                : winner === 1
-                ? battle.player1_name
+              {winner === 0 ? "It's a Tie!"
+                : winner === 1 ? battle.player1_name
                 : battle.player2_name}
             </p>
             <p className="text-xs text-[#666] mt-1">{totalVotes} total votes</p>
@@ -262,7 +350,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
           onSetTrack={handleSetTrack}
           loading={trackLoading}
           disabled={battle.status !== 'waiting'}
-          status={battle.status}
+          highlighted={battle.status === 'live' && phase === 'p1'}
         />
 
         <div className="flex flex-col items-center justify-center pt-16 shrink-0">
@@ -277,12 +365,12 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
           onSetTrack={handleSetTrack}
           loading={trackLoading}
           disabled={battle.status !== 'waiting'}
-          status={battle.status}
+          highlighted={battle.status === 'live' && phase === 'p2'}
         />
       </div>
 
-      {/* Vote bar */}
-      {(battle.status === 'live' || battle.status === 'finished') && (
+      {/* Vote bar — only during vote phase and after */}
+      {(battle.status === 'live' && phase === 'vote') || battle.status === 'finished' ? (
         <div className="w-full mb-6">
           <VoteBar
             p1Votes={battle.player1_votes}
@@ -291,10 +379,17 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
             p2Name={battle.player2_name}
           />
         </div>
+      ) : null}
+
+      {/* Audience: listen up message during preview phases */}
+      {battle.status === 'live' && (phase === 'p1' || phase === 'p2') && !isPlayer && (
+        <p className="text-center text-xs text-[#444] uppercase tracking-wider mb-4">
+          Listen up — voting opens in {phase === 'p1' ? P1_END + (P2_END - P1_END) - elapsed : P2_END - elapsed}s
+        </p>
       )}
 
-      {/* Vote buttons (voters only, while live) */}
-      {battle.status === 'live' && !isPlayer && (
+      {/* Vote buttons — only during vote phase, non-players */}
+      {battle.status === 'live' && phase === 'vote' && !isPlayer && (
         <div className="w-full">
           {hasVoted ? (
             <div className="text-center text-sm text-[#666]">
@@ -323,7 +418,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         </div>
       )}
 
-      {/* Start button (player 1 only, when ready) */}
+      {/* Start button */}
       {battle.status === 'ready' && myRole === 'player1' && (
         <button
           onClick={handleStartBattle}
@@ -333,7 +428,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         </button>
       )}
 
-      {/* Player waiting message */}
+      {/* Player competing message */}
       {battle.status === 'live' && isPlayer && (
         <div className="text-center text-xs text-[#444] uppercase tracking-wider">
           You are competing — sit back and watch the votes roll in
@@ -344,7 +439,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
       {battle.status === 'finished' && (
         <button
           onClick={() => router.push('/')}
-          className="w-full border border-[#222] hover:border-[#444] text-white font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition-colors"
+          className="mt-4 w-full border border-[#222] hover:border-[#444] text-white font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition-colors"
         >
           New Battle
         </button>

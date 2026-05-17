@@ -26,6 +26,32 @@ async function getAccessToken(): Promise<string> {
   return tokenCache.token
 }
 
+async function getChorusStartMs(trackId: string, durationMs: number): Promise<number> {
+  try {
+    const token = await getAccessToken()
+    const res = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return Math.floor(durationMs * 0.33)
+
+    const data = await res.json()
+    const durationSec = durationMs / 1000
+    const sections: Array<{ start: number; loudness: number }> = data.sections ?? []
+
+    // Loudest section in the 20–65% range is typically the chorus
+    const candidates = sections.filter(s => {
+      const pos = s.start / durationSec
+      return pos >= 0.2 && pos <= 0.65
+    })
+
+    if (!candidates.length) return Math.floor(durationMs * 0.33)
+    const loudest = candidates.reduce((a, b) => (a.loudness > b.loudness ? a : b))
+    return Math.floor(loudest.start * 1000)
+  } catch {
+    return Math.floor(durationMs * 0.33)
+  }
+}
+
 export function parseSpotifyTrackId(input: string): string | null {
   const uriMatch = input.match(/spotify:track:([a-zA-Z0-9]+)/)
   if (uriMatch) return uriMatch[1]
@@ -45,6 +71,8 @@ export async function getTrack(trackId: string) {
   if (!res.ok) return null
 
   const data = await res.json()
+  const chorusStartMs = await getChorusStartMs(trackId, data.duration_ms)
+
   return {
     id: data.id,
     name: data.name,
@@ -54,5 +82,6 @@ export async function getTrack(trackId: string) {
     previewUrl: data.preview_url,
     spotifyUrl: data.external_urls.spotify,
     durationMs: data.duration_ms,
+    chorusStartMs,
   }
 }
