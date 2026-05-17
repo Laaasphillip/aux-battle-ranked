@@ -14,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={geist.variable}>
       <body className="min-h-screen">
         {children}
-        <p className="fixed bottom-3 right-4 text-[10px] text-[#2a2a2a] pointer-events-none select-none tracking-wider">
+        <p className="fixed bottom-3 right-4 text-[10px] text-[#555] pointer-events-none select-none tracking-wider">
           Created by neveragaxn
         </p>
       </body>
