@@ -31,8 +31,6 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const [voteError, setVoteError] = useState('')
   const [copied, setCopied] = useState(false)
   const battleEndedRef = useRef(false)
-  const audio1Ref = useRef<HTMLAudioElement | null>(null)
-  const audio2Ref = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     const role = localStorage.getItem(`auxbattle_role_${battle.code}`) as 'player1' | 'player2' | null
@@ -83,27 +81,6 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [battle.status, battle.started_at, battle.vote_duration, battle.code])
-
-  // Audio playback when battle goes live
-  useEffect(() => {
-    if (battle.status !== 'live') return
-
-    if (battle.player1_track?.previewUrl) {
-      audio1Ref.current = new Audio(battle.player1_track.previewUrl)
-      audio1Ref.current.volume = 0.7
-      audio1Ref.current.play().catch(() => {})
-    }
-    if (battle.player2_track?.previewUrl) {
-      audio2Ref.current = new Audio(battle.player2_track.previewUrl)
-      audio2Ref.current.volume = 0.7
-      audio2Ref.current.play().catch(() => {})
-    }
-
-    return () => {
-      audio1Ref.current?.pause()
-      audio2Ref.current?.pause()
-    }
-  }, [battle.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolveTrack = useCallback(async (url: string): Promise<SpotifyTrack | null> => {
     setTrackLoading(true)
@@ -285,6 +262,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
           onSetTrack={handleSetTrack}
           loading={trackLoading}
           disabled={battle.status !== 'waiting'}
+          status={battle.status}
         />
 
         <div className="flex flex-col items-center justify-center pt-16 shrink-0">
@@ -299,6 +277,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
           onSetTrack={handleSetTrack}
           loading={trackLoading}
           disabled={battle.status !== 'waiting'}
+          status={battle.status}
         />
       </div>
 
