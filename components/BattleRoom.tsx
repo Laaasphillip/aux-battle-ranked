@@ -7,9 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import TrackCard from './TrackCard'
 import VoteBar from './VoteBar'
 
-const P1_END = 15
-const P2_END = 30
-const TOTAL = 40
+const P1_END = 30
+const P2_END = 60
+const TOTAL = 90
 
 function getVoterId(): string {
   const key = 'auxbattle_voter_id'
@@ -219,7 +219,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     : phase === 'vote' ? elapsed - P2_END
     : 0
 
-  const phaseTotal = phase === 'vote' ? 10 : 15
+  const phaseTotal = phase === 'vote' ? 30 : 30
   const phasePct = Math.min(100, (phaseElapsed / phaseTotal) * 100)
 
   const phaseColor =
@@ -384,7 +384,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
       {/* Audience: listen up message during preview phases */}
       {battle.status === 'live' && (phase === 'p1' || phase === 'p2') && !isPlayer && (
         <p className="text-center text-xs text-[#444] uppercase tracking-wider mb-4">
-          Listen up — voting opens in {phase === 'p1' ? P1_END + (P2_END - P1_END) - elapsed : P2_END - elapsed}s
+          Listen up — voting opens in {Math.max(0, P2_END - elapsed)}s
         </p>
       )}
 
