@@ -26,29 +26,19 @@ async function getAccessToken(): Promise<string> {
   return tokenCache.token
 }
 
-async function getChorusStartMs(trackId: string, durationMs: number): Promise<number> {
+// Deezer provides free 30s preview URLs with no auth required
+async function getDeezerPreview(trackName: string, artist: string): Promise<string | null> {
   try {
-    const token = await getAccessToken()
-    const res = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) return Math.floor(durationMs * 0.33)
-
+    const q = encodeURIComponent(`${trackName} ${artist.split(',')[0].trim()}`)
+    const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=5`)
+    if (!res.ok) return null
     const data = await res.json()
-    const durationSec = durationMs / 1000
-    const sections: Array<{ start: number; loudness: number }> = data.sections ?? []
-
-    // Loudest section in the 20–65% range is typically the chorus
-    const candidates = sections.filter(s => {
-      const pos = s.start / durationSec
-      return pos >= 0.2 && pos <= 0.65
-    })
-
-    if (!candidates.length) return Math.floor(durationMs * 0.33)
-    const loudest = candidates.reduce((a, b) => (a.loudness > b.loudness ? a : b))
-    return Math.floor(loudest.start * 1000)
+    const match = (data.data ?? []).find(
+      (t: { preview: string }) => t.preview
+    )
+    return match?.preview ?? null
   } catch {
-    return Math.floor(durationMs * 0.33)
+    return null
   }
 }
 
@@ -71,17 +61,23 @@ export async function getTrack(trackId: string) {
   if (!res.ok) return null
 
   const data = await res.json()
-  const chorusStartMs = await getChorusStartMs(trackId, data.duration_ms)
+  const trackName = data.name
+  const artist = data.artists.map((a: { name: string }) => a.name).join(', ')
+
+  // Spotify deprecated preview_url for many tracks — fall back to Deezer
+  let previewUrl: string | null = data.preview_url
+  if (!previewUrl) {
+    previewUrl = await getDeezerPreview(trackName, artist)
+  }
 
   return {
     id: data.id,
-    name: data.name,
-    artist: data.artists.map((a: { name: string }) => a.name).join(', '),
+    name: trackName,
+    artist,
     album: data.album.name,
     albumArt: data.album.images[0]?.url ?? '',
-    previewUrl: data.preview_url,
+    previewUrl,
     spotifyUrl: data.external_urls.spotify,
     durationMs: data.duration_ms,
-    chorusStartMs,
   }
 }

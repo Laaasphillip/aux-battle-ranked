@@ -9,7 +9,6 @@ export interface SpotifyTrack {
   previewUrl: string | null
   spotifyUrl: string
   durationMs: number
-  chorusStartMs?: number
 }
 
 export interface Battle {

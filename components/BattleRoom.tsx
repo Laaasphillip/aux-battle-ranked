@@ -101,7 +101,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     if (!track?.previewUrl) return
 
     const audio = new Audio(track.previewUrl)
-    audio.currentTime = (track.chorusStartMs ?? 0) / 1000
+    audio.currentTime = 0
     audio.volume = 0.85
     audio.play().catch(() => {})
     audioRef.current = audio
