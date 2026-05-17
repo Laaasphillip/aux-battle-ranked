@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const { error } = await db.from('battles').insert({
       code,
       player1_name: playerName.trim(),
-      vote_duration: 90,
+      vote_duration: 70,
     })
 
     if (!error) break

@@ -9,7 +9,7 @@ import VoteBar from './VoteBar'
 
 const P1_END = 30
 const P2_END = 60
-const TOTAL = 90
+const TOTAL = 70
 
 function getVoterId(): string {
   const key = 'auxbattle_voter_id'
@@ -219,7 +219,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     : phase === 'vote' ? elapsed - P2_END
     : 0
 
-  const phaseTotal = phase === 'vote' ? 30 : 30
+  const phaseTotal = phase === 'vote' ? 10 : 30
   const phasePct = Math.min(100, (phaseElapsed / phaseTotal) * 100)
 
   const phaseColor =
