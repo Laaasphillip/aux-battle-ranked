@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { getRank } from '@/lib/ranks'
+import { getRank, RANKS } from '@/lib/ranks'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -18,11 +18,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
   const rank = getRank(profile.elo)
   const total = profile.wins + profile.losses
   const winRate = total > 0 ? Math.round((profile.wins / total) * 100) : 0
-  const nextRankElo = (() => {
-    const { RANKS } = require('@/lib/ranks')
-    const idx = RANKS.findIndex((r: { name: string }) => r.name === rank.name)
-    return RANKS[idx + 1]?.min ?? null
-  })()
+  const rankIdx = RANKS.findIndex(r => r.name === rank.name)
+  const nextRankElo = RANKS[rankIdx + 1]?.min ?? null
   const eloToNext = nextRankElo ? nextRankElo - profile.elo : null
   const rankProgress = nextRankElo
     ? Math.min(100, ((profile.elo - rank.min) / (nextRankElo - rank.min)) * 100)

@@ -103,6 +103,8 @@ export default function Home() {
     router.push(`/battle/${code}`)
   }
 
+  const userRank = getRank(userElo)
+
   return (
     <main className="min-h-screen flex flex-col items-center px-4 pt-14 pb-16 max-w-md mx-auto">
 
@@ -172,39 +174,35 @@ export default function Home() {
         {/* Account */}
         {!authChecked ? (
           <div className="w-full h-[66px] bg-[#111] border border-[#222] rounded-2xl" />
-        ) : username ? (() => {
-          const rank = getRank(userElo)
-          return (
-            <div className="w-full flex items-center gap-4 bg-[#111] border border-[#222] rounded-2xl px-5 py-4">
-              <Link href={`/profile/${encodeURIComponent(username)}`} className="flex items-center gap-4 flex-1 min-w-0 group">
-                <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 flex items-center justify-center shrink-0 text-[#ef4444] group-hover:bg-[#ef4444]/20 transition-colors">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-                    <circle cx="9" cy="6" r="3.5"/>
-                    <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
-                  </svg>
+        ) : username ? (
+          <div className="w-full flex items-center gap-4 bg-[#111] border border-[#222] rounded-2xl px-5 py-4">
+            <Link href={`/profile/${encodeURIComponent(username)}`} className="flex items-center gap-4 flex-1 min-w-0 group">
+              <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 flex items-center justify-center shrink-0 text-[#ef4444] group-hover:bg-[#ef4444]/20 transition-colors">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                  <circle cx="9" cy="6" r="3.5"/>
+                  <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black uppercase tracking-widest text-white truncate">{username}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span
+                    className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border"
+                    style={{ background: userRank.color, borderColor: userRank.border, color: userRank.text }}
+                  >
+                    {userRank.name}
+                  </span>
+                  <span className="text-xs text-[#555]">{userElo} ELO</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black uppercase tracking-widest text-white truncate">{username}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span
-                      className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border"
-                      style={{ background: rank.color, borderColor: rank.border, color: rank.text }}
-                    >
-                      {rank.name}
-                    </span>
-                    <span className="text-xs text-[#555]">{userElo} ELO</span>
-                  </div>
-                </div>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="text-xs font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444] transition-colors shrink-0"
-              >
-                Log out
-              </button>
-            </div>
-          )
-        })()
+              </div>
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-xs font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444] transition-colors shrink-0"
+            >
+              Log out
+            </button>
+          </div>
         ) : (
           <button
             onClick={() => setShowAuth(true)}
