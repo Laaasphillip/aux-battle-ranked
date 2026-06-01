@@ -32,6 +32,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const [elapsed, setElapsed] = useState(0)
   const [phase, setPhase] = useState<'p1' | 'p2' | 'vote' | null>(null)
   const [audioReady, setAudioReady] = useState(false)
+  const [volume, setVolume] = useState(0.8)
   const [hasVoted, setHasVoted] = useState(false)
   const [votedFor, setVotedFor] = useState<1 | 2 | null>(null)
   const [voteError, setVoteError] = useState('')
@@ -119,7 +120,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
 
     const audio = new Audio(track.previewUrl)
     audio.currentTime = 0
-    audio.volume = 0.85
+    audio.volume = volume
     audio.play().catch(() => {})
     audioRef.current = audio
 
@@ -144,6 +145,10 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
       iframe.contentWindow?.postMessage(JSON.stringify({ method: 'pause' }), 'https://w.soundcloud.com')
     }
   }, [phase, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
 
   // Stop audio when battle ends
   useEffect(() => {
@@ -295,14 +300,34 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         </div>
       </div>
 
-      {/* Enable audio banner */}
-      {!audioReady && battle.status !== 'finished' && (
-        <button
-          onClick={handleEnableAudio}
-          className="w-full mb-4 bg-[#111] border border-[#fbbf24]/40 rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-xs font-semibold text-[#fbbf24] hover:bg-[#1a1a1a] transition-colors"
-        >
-          <span>🔊</span> Tap to enable sound before the battle starts
-        </button>
+      {/* Audio controls */}
+      {battle.status !== 'finished' && (
+        <div className="w-full mb-4">
+          {!audioReady ? (
+            <button
+              onClick={handleEnableAudio}
+              className="w-full bg-[#111] border border-[#fbbf24]/40 rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-xs font-semibold text-[#fbbf24] hover:bg-[#1a1a1a] transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M2 5h2.5L8 2v10L4.5 9H2a1 1 0 01-1-1V6a1 1 0 011-1zm9.5-.5a5 5 0 010 5M9.5 6a2.5 2.5 0 010 2"/></svg>
+              Tap to enable sound
+            </button>
+          ) : (
+            <div className="w-full bg-[#111] border border-[#222] rounded-xl px-4 py-2.5 flex items-center gap-3">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill={volume === 0 ? '#444' : '#aaa'}>
+                <path d="M2 5h2.5L8 2v10L4.5 9H2a1 1 0 01-1-1V6a1 1 0 011-1z"/>
+                {volume > 0 && <path d="M9.5 6a2.5 2.5 0 010 2" stroke="#aaa" strokeWidth="1.2" fill="none" strokeLinecap="round"/>}
+                {volume > 0.5 && <path d="M11.5 4.5a5 5 0 010 5" stroke="#aaa" strokeWidth="1.2" fill="none" strokeLinecap="round"/>}
+              </svg>
+              <input
+                type="range" min="0" max="100" value={Math.round(volume * 100)}
+                onChange={e => setVolume(Number(e.target.value) / 100)}
+                className="flex-1 h-1 rounded-full outline-none cursor-pointer appearance-none"
+                style={{ background: `linear-gradient(to right, #aaa ${volume * 100}%, #2a2a2a ${volume * 100}%)` }}
+              />
+              <span className="text-[10px] text-[#444] w-7 text-right tabular-nums">{Math.round(volume * 100)}%</span>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Status bar */}

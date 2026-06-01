@@ -71,6 +71,8 @@ export default function ChillRoom({
   const [myId, setMyId] = useState('')
   const [myColor, setMyColor] = useState(COLORS[0])
   const [addError, setAddError] = useState('')
+  const [volume, setVolume] = useState(0.75)
+  const [clickTarget, setClickTarget] = useState<{ x: number; y: number; t: number } | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
@@ -169,7 +171,7 @@ export default function ChillRoom({
     const elapsed = (Date.now() - new Date(currentSong.started_at).getTime()) / 1000
     if (elapsed >= 29) { handleSongEnd(); return }
     audio.currentTime = Math.max(0, elapsed)
-    audio.volume = 0.75
+    audio.volume = volume
     audio.play().catch(() => {})
     audio.addEventListener('ended', handleSongEnd)
     audioRef.current = audio
@@ -185,11 +187,16 @@ export default function ChillRoom({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
+
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const x = Math.min(95, Math.max(5, ((e.clientX - rect.left) / rect.width) * 100))
     const y = Math.min(93, Math.max(5, ((e.clientY - rect.top) / rect.height) * 100))
     setMyPos({ x, y })
+    setClickTarget({ x, y, t: Date.now() })
     channelRef.current?.track({ username: myName, color: myColor, x, y })
     channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x, y } })
   }
@@ -304,7 +311,22 @@ export default function ChillRoom({
           <span className="text-[10px] text-[#333]">·</span>
           <span className="text-[10px] text-[#444]">{playerCount} online</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {audioReady && (
+            <div className="flex items-center gap-2">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill={volume === 0 ? '#333' : '#555'}>
+                <path d="M2 5h2.5L8 2v10L4.5 9H2a1 1 0 01-1-1V6a1 1 0 011-1z"/>
+                {volume > 0 && <path d="M9.5 6a2.5 2.5 0 010 2" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>}
+                {volume > 0.5 && <path d="M11.5 4.5a5 5 0 010 5" stroke="#555" strokeWidth="1.2" fill="none" strokeLinecap="round"/>}
+              </svg>
+              <input
+                type="range" min="0" max="100" value={Math.round(volume * 100)}
+                onChange={e => setVolume(Number(e.target.value) / 100)}
+                className="w-16 h-1 rounded-full outline-none cursor-pointer appearance-none"
+                style={{ background: `linear-gradient(to right, #666 ${volume * 100}%, #2a2a2a ${volume * 100}%)` }}
+              />
+            </div>
+          )}
           <div className="w-2 h-2 rounded-full" style={{ background: myColor }} />
           <span className="text-xs text-[#555]">{myName}</span>
         </div>
@@ -324,13 +346,93 @@ export default function ChillRoom({
             </button>
           )}
           <div
-            className="w-full h-full cursor-crosshair select-none"
+            className="w-full h-full cursor-crosshair select-none relative"
             style={{
               backgroundImage: 'radial-gradient(circle, #1c1c1c 1px, transparent 1px)',
               backgroundSize: '28px 28px',
             }}
             onClick={handleWorldClick}
           >
+            {/* ── Room decorations ── */}
+
+            {/* Stage (top-center) */}
+            <div className="absolute pointer-events-none flex flex-col items-center justify-center gap-1.5"
+              style={{ left: '28%', top: '4%', width: '44%', height: '20%' }}>
+              <div className="w-full h-full rounded-2xl border border-[#ef4444]/25 bg-[#110808] flex flex-col items-center justify-center gap-1.5"
+                style={{ boxShadow: 'inset 0 0 30px #ef444408' }}>
+                <p className="text-[8px] font-black uppercase tracking-widest text-[#ef4444]/40">Stage</p>
+                <div className="flex items-end gap-0.5">
+                  {[5, 10, 7, 12, 8, 11, 6, 9, 5].map((h, i) => (
+                    <div key={i} className="w-1 rounded-sm" style={{
+                      height: `${currentSong ? h + Math.sin(Date.now() / 300 + i) * 3 : 3}px`,
+                      background: '#ef4444',
+                      opacity: currentSong ? 0.5 : 0.15,
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Round table — left */}
+            <div className="absolute pointer-events-none"
+              style={{ left: '14%', top: '52%', transform: 'translate(-50%, -50%)' }}>
+              <div className="w-14 h-14 rounded-full border border-[#252525] bg-[#111] flex items-center justify-center"
+                style={{ boxShadow: '0 2px 8px #00000060' }}>
+                <div className="w-5 h-5 rounded-full bg-[#161616] border border-[#222]" />
+              </div>
+              {/* Seats */}
+              {[0, 90, 180, 270].map(deg => (
+                <div key={deg} className="absolute w-3 h-3 rounded-full bg-[#1a1a1a] border border-[#2a2a2a]"
+                  style={{
+                    left: `calc(50% + ${Math.cos((deg * Math.PI) / 180) * 32}px - 6px)`,
+                    top: `calc(50% + ${Math.sin((deg * Math.PI) / 180) * 32}px - 6px)`,
+                  }} />
+              ))}
+            </div>
+
+            {/* Round table — right */}
+            <div className="absolute pointer-events-none"
+              style={{ left: '83%', top: '52%', transform: 'translate(-50%, -50%)' }}>
+              <div className="w-14 h-14 rounded-full border border-[#252525] bg-[#111] flex items-center justify-center"
+                style={{ boxShadow: '0 2px 8px #00000060' }}>
+                <div className="w-5 h-5 rounded-full bg-[#161616] border border-[#222]" />
+              </div>
+              {[0, 90, 180, 270].map(deg => (
+                <div key={deg} className="absolute w-3 h-3 rounded-full bg-[#1a1a1a] border border-[#2a2a2a]"
+                  style={{
+                    left: `calc(50% + ${Math.cos((deg * Math.PI) / 180) * 32}px - 6px)`,
+                    top: `calc(50% + ${Math.sin((deg * Math.PI) / 180) * 32}px - 6px)`,
+                  }} />
+              ))}
+            </div>
+
+            {/* Lounge / couch (bottom-center) */}
+            <div className="absolute pointer-events-none flex items-center justify-center"
+              style={{ left: '28%', top: '78%', width: '44%', height: '11%' }}>
+              <div className="w-full h-full rounded-2xl border border-[#222] bg-[#0f0f0f] flex items-center justify-center"
+                style={{ boxShadow: 'inset 0 0 20px #00000040' }}>
+                <p className="text-[8px] text-[#222] uppercase tracking-widest font-black">Lounge</p>
+              </div>
+            </div>
+
+            {/* Corner plants */}
+            {[{ l: '2%', t: '2%' }, { l: '95%', t: '2%' }, { l: '2%', t: '88%' }, { l: '95%', t: '88%' }].map((pos, i) => (
+              <div key={i} className="absolute pointer-events-none w-5 h-5 rounded-full border border-[#1a2f1a]"
+                style={{ left: pos.l, top: pos.t, background: '#0a140a' }} />
+            ))}
+
+            {/* ── Click ripple ── */}
+            {clickTarget && (
+              <div
+                key={clickTarget.t}
+                className="absolute pointer-events-none"
+                style={{ left: `${clickTarget.x}%`, top: `${clickTarget.y}%`, transform: 'translate(-50%, -50%)' }}
+              >
+                <div className="w-8 h-8 rounded-full border border-white/30 animate-ping" />
+              </div>
+            )}
+
+            {/* ── Players ── */}
             {Object.values(players).map(player => (
               <div
                 key={player.id}
@@ -339,27 +441,36 @@ export default function ChillRoom({
                   left: `${player.x}%`,
                   top: `${player.y}%`,
                   transform: 'translate(-50%, -50%)',
-                  transition: player.id === myId ? 'left 0.15s ease, top 0.15s ease' : 'left 0.3s ease, top 0.3s ease',
+                  transition: player.id === myId ? 'left 0.18s ease, top 0.18s ease' : 'left 0.35s ease, top 0.35s ease',
+                  zIndex: player.id === myId ? 10 : 5,
                 }}
               >
+                {/* Outer glow ring */}
+                <div className="absolute inset-0 rounded-full opacity-40"
+                  style={{ background: player.color, filter: 'blur(6px)', transform: 'scale(1.4)' }} />
+                {/* Avatar */}
                 <div
-                  className="w-10 h-10 rounded-full mx-auto"
+                  className="w-11 h-11 rounded-full relative mx-auto"
                   style={{
-                    background: player.color,
-                    border: player.id === myId ? '2px solid rgba(255,255,255,0.5)' : '2px solid rgba(255,255,255,0.1)',
-                    boxShadow: player.id === myId ? `0 0 14px ${player.color}90` : `0 0 6px ${player.color}40`,
+                    background: `radial-gradient(circle at 35% 35%, ${player.color}dd, ${player.color}88)`,
+                    border: player.id === myId ? '2px solid rgba(255,255,255,0.6)' : '2px solid rgba(255,255,255,0.15)',
+                    boxShadow: `0 4px 12px ${player.color}50`,
                   }}
-                />
-                <p
-                  className="text-[9px] text-center mt-1 whitespace-nowrap font-semibold"
-                  style={{ color: player.id === myId ? 'white' : '#aaa', textShadow: '0 1px 4px #000' }}
                 >
-                  {player.username}{player.id === myId ? ' ●' : ''}
-                </p>
+                  {/* Shine */}
+                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/30" />
+                </div>
+                {/* Name tag */}
+                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm mx-auto w-fit">
+                  <p className="text-[9px] font-bold whitespace-nowrap"
+                    style={{ color: player.id === myId ? 'white' : '#ccc' }}>
+                    {player.username}{player.id === myId ? ' ▪' : ''}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
-          <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#2a2a2a] pointer-events-none">
+          <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#1e1e1e] pointer-events-none select-none">
             Click anywhere to move
           </p>
         </div>
