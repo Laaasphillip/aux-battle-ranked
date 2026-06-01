@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { SpotifyTrack } from '@/types'
@@ -76,13 +76,11 @@ export default function ChillRoom({
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
-  const advancingRef = useRef(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const currentSongRef = useRef<QueueEntry | null>(null)
+  const playerCountRef = useRef(0)
 
   const currentSong = queue.find(q => q.status === 'playing') ?? null
   const waitingQueue = queue.filter(q => q.status === 'waiting')
-  currentSongRef.current = currentSong
 
   // Init identity
   useEffect(() => {
@@ -106,6 +104,7 @@ export default function ChillRoom({
 
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState<{ username: string; color: string; x: number; y: number }>()
+      playerCountRef.current = Object.keys(state).length
       const next: Record<string, Player> = {}
       for (const [key, list] of Object.entries(state)) {
         const p = list[0]
@@ -138,19 +137,6 @@ export default function ChillRoom({
       }
     )
 
-    // Delete room when last player leaves
-    channel.on('presence', { event: 'leave' }, () => {
-      const state = channel.presenceState()
-      if (Object.keys(state).length === 0) {
-        fetch('/api/chill/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId: room.id }),
-          keepalive: true,
-        })
-      }
-    })
-
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myName, color: myColor, x: 50, y: 50 })
@@ -160,38 +146,68 @@ export default function ChillRoom({
     return () => { supabase.removeChannel(channel) }
   }, [myId, myName, myColor, room.id])
 
-  // Audio sync
-  const handleSongEnd = useCallback(async () => {
-    const song = currentSongRef.current
-    if (advancingRef.current || !song) return
-    advancingRef.current = true
-    await fetch('/api/chill/queue/next', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId: room.id, currentId: song.id }),
-    })
-    advancingRef.current = false
-  }, [room.id])
-
+  // Delete room when we are the last player — fires on tab close and internal navigation
   useEffect(() => {
-    if (!audioReady || !currentSong?.started_at || !currentSong.track.previewUrl) {
-      audioRef.current?.pause()
-      return
+    if (!myId) return
+
+    const deleteIfEmpty = () => {
+      // playerCountRef.current includes ourselves, so <= 1 means we're the last
+      if (playerCountRef.current <= 1) {
+        const blob = new Blob(
+          [JSON.stringify({ roomId: room.id })],
+          { type: 'application/json' }
+        )
+        navigator.sendBeacon('/api/chill/delete', blob)
+      }
     }
+
+    window.addEventListener('beforeunload', deleteIfEmpty)
+    return () => {
+      window.removeEventListener('beforeunload', deleteIfEmpty)
+      deleteIfEmpty() // also runs on internal Next.js navigation (component unmount)
+    }
+  }, [myId, room.id])
+
+  // Audio — plays from start to finish, auto-advances queue when done
+  useEffect(() => {
     audioRef.current?.pause()
+    audioRef.current = null
+
+    if (!audioReady || !currentSong) return
+
+    const songId = currentSong.id
+    const roomId = room.id
+
+    // No preview URL — skip this entry automatically
+    if (!currentSong.track.previewUrl) {
+      const t = setTimeout(() => {
+        fetch('/api/chill/queue/next', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId, currentId: songId }),
+        })
+      }, 500)
+      return () => clearTimeout(t)
+    }
 
     const audio = new Audio(currentSong.track.previewUrl)
     audio.currentTime = 0
     audio.volume = volume
-    audio.play().catch(() => {})
-    audio.addEventListener('ended', handleSongEnd)
+    audio.onended = () => {
+      fetch('/api/chill/queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, currentId: songId }),
+      })
+    }
+    audio.play().catch(err => console.warn('Chill audio play failed:', err))
     audioRef.current = audio
 
     return () => {
-      audio.removeEventListener('ended', handleSongEnd)
+      audio.onended = null
       audio.pause()
     }
-  }, [currentSong?.id, audioReady, handleSongEnd]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSong?.id, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll chat
   useEffect(() => {
