@@ -32,8 +32,8 @@ export async function POST(request: Request) {
     if (p1v !== p2v) {
       const winnerId = p1v > p2v ? p1id : p2id
       const loserId  = p1v > p2v ? p2id : p1id
-      if (winnerId) await db.rpc('increment_wins',   { p_user_id: winnerId })
-      if (loserId)  await db.rpc('increment_losses', { p_user_id: loserId })
+      if (winnerId) await db.rpc('apply_win',  { p_user_id: winnerId })
+      if (loserId)  await db.rpc('apply_loss', { p_user_id: loserId })
     }
   }
 

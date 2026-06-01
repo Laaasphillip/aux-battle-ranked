@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import AuthModal from '@/components/AuthModal'
+import { getRank } from '@/lib/ranks'
 
 const ChevronRight = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -20,6 +21,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [username, setUsername] = useState<string | null>(null)
   const [userWins, setUserWins] = useState(0)
+  const [userElo, setUserElo] = useState(500)
   const [showAuth, setShowAuth] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [lobbyCount, setLobbyCount] = useState<number | null>(null)
@@ -31,13 +33,14 @@ export default function Home() {
       if (session) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, wins')
+          .select('username, wins, elo')
           .eq('id', session.user.id)
           .single()
         if (profile?.username) {
           setUsername(profile.username)
           setName(profile.username)
           setUserWins(profile.wins ?? 0)
+          setUserElo(profile.elo ?? 500)
         }
       }
       setAuthChecked(true)
@@ -57,6 +60,7 @@ export default function Home() {
     setUsername(null)
     setName('')
     setUserWins(0)
+    setUserElo(500)
   }
 
   function handleAuthSuccess(uname: string) {
@@ -168,25 +172,39 @@ export default function Home() {
         {/* Account */}
         {!authChecked ? (
           <div className="w-full h-[66px] bg-[#111] border border-[#222] rounded-2xl" />
-        ) : username ? (
-          <div className="w-full flex items-center gap-4 bg-[#111] border border-[#222] rounded-2xl px-5 py-4">
-            <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 flex items-center justify-center shrink-0 text-[#ef4444]">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-                <circle cx="9" cy="6" r="3.5"/>
-                <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
-              </svg>
+        ) : username ? (() => {
+          const rank = getRank(userElo)
+          return (
+            <div className="w-full flex items-center gap-4 bg-[#111] border border-[#222] rounded-2xl px-5 py-4">
+              <Link href={`/profile/${encodeURIComponent(username)}`} className="flex items-center gap-4 flex-1 min-w-0 group">
+                <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 flex items-center justify-center shrink-0 text-[#ef4444] group-hover:bg-[#ef4444]/20 transition-colors">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                    <circle cx="9" cy="6" r="3.5"/>
+                    <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black uppercase tracking-widest text-white truncate">{username}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border"
+                      style={{ background: rank.color, borderColor: rank.border, color: rank.text }}
+                    >
+                      {rank.name}
+                    </span>
+                    <span className="text-xs text-[#555]">{userElo} ELO</span>
+                  </div>
+                </div>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="text-xs font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444] transition-colors shrink-0"
+              >
+                Log out
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-black uppercase tracking-widest text-white truncate">{username}</p>
-              <p className="text-xs text-[#555] mt-0.5">{userWins} win{userWins !== 1 ? 's' : ''}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="text-xs font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444] transition-colors shrink-0"
-            >
-              Log out
-            </button>
-          </div>
+          )
+        })()
         ) : (
           <button
             onClick={() => setShowAuth(true)}
