@@ -124,9 +124,9 @@ export default function Home() {
         {/* Lobbies */}
         <Link
           href="/lobbies"
-          className="group w-full flex items-center gap-4 bg-[#0a130b] border border-[#22c55e]/20 hover:border-[#22c55e]/50 rounded-2xl px-5 py-4 transition-all duration-200"
+          className="group w-full flex items-center gap-4 bg-[#111] border border-[#222] hover:border-[#ef4444]/40 rounded-2xl px-5 py-4 transition-all duration-200"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#22c55e]/10 group-hover:bg-[#22c55e]/20 flex items-center justify-center shrink-0 text-[#22c55e] transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/15 flex items-center justify-center shrink-0 text-[#ef4444] transition-colors">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="1" y="2" width="10" height="14" rx="2"/>
               <path d="M13 9h4M15 7l2 2-2 2"/>
@@ -134,12 +134,12 @@ export default function Home() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black uppercase tracking-widest text-[#22c55e]">Lobbies</p>
-            <p className="text-xs text-[#3d5e40] mt-0.5">
+            <p className="text-sm font-black uppercase tracking-widest text-white">Lobbies</p>
+            <p className="text-xs text-[#555] mt-0.5">
               {lobbyCount === null ? 'Loading...' : lobbyCount === 0 ? 'No active rooms' : `${lobbyCount} room${lobbyCount === 1 ? '' : 's'} open`}
             </p>
           </div>
-          <span className="text-[#22c55e]/40 group-hover:text-[#22c55e]/80 transition-colors">
+          <span className="text-[#444] group-hover:text-[#ef4444] transition-colors">
             <ChevronRight />
           </span>
         </Link>
@@ -147,9 +147,9 @@ export default function Home() {
         {/* Leaderboard */}
         <Link
           href="/leaderboard"
-          className="group w-full flex items-center gap-4 bg-[#130f00] border border-[#fbbf24]/20 hover:border-[#fbbf24]/50 rounded-2xl px-5 py-4 transition-all duration-200"
+          className="group w-full flex items-center gap-4 bg-[#111] border border-[#222] hover:border-[#ef4444]/40 rounded-2xl px-5 py-4 transition-all duration-200"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#fbbf24]/10 group-hover:bg-[#fbbf24]/20 flex items-center justify-center shrink-0 text-[#fbbf24] transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/15 flex items-center justify-center shrink-0 text-[#ef4444] transition-colors">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
               <rect x="1" y="10" width="4.5" height="7" rx="1"/>
               <rect x="6.75" y="5" width="4.5" height="12" rx="1"/>
@@ -157,32 +157,32 @@ export default function Home() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black uppercase tracking-widest text-[#fbbf24]">Leaderboard</p>
-            <p className="text-xs text-[#5e4d00] mt-0.5">See who&apos;s on top</p>
+            <p className="text-sm font-black uppercase tracking-widest text-white">Leaderboard</p>
+            <p className="text-xs text-[#555] mt-0.5">See who&apos;s on top</p>
           </div>
-          <span className="text-[#fbbf24]/40 group-hover:text-[#fbbf24]/80 transition-colors">
+          <span className="text-[#444] group-hover:text-[#ef4444] transition-colors">
             <ChevronRight />
           </span>
         </Link>
 
         {/* Account */}
         {!authChecked ? (
-          <div className="w-full h-[66px] bg-[#111] border border-[#1a1a1a] rounded-2xl animate-pulse" />
+          <div className="w-full h-[66px] bg-[#111] border border-[#222] rounded-2xl" />
         ) : username ? (
-          <div className="w-full flex items-center gap-4 bg-[#0a0f1a] border border-[#3b82f6]/20 rounded-2xl px-5 py-4">
-            <div className="w-10 h-10 rounded-xl bg-[#3b82f6]/10 flex items-center justify-center shrink-0 text-[#3b82f6]">
+          <div className="w-full flex items-center gap-4 bg-[#111] border border-[#222] rounded-2xl px-5 py-4">
+            <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 flex items-center justify-center shrink-0 text-[#ef4444]">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                 <circle cx="9" cy="6" r="3.5"/>
                 <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black uppercase tracking-widest text-[#3b82f6] truncate">{username}</p>
-              <p className="text-xs text-[#1e3a5e] mt-0.5">{userWins} win{userWins !== 1 ? 's' : ''}</p>
+              <p className="text-sm font-black uppercase tracking-widest text-white truncate">{username}</p>
+              <p className="text-xs text-[#555] mt-0.5">{userWins} win{userWins !== 1 ? 's' : ''}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="text-xs font-bold uppercase tracking-wider text-[#333] hover:text-[#ef4444] transition-colors shrink-0"
+              className="text-xs font-bold uppercase tracking-wider text-[#444] hover:text-[#ef4444] transition-colors shrink-0"
             >
               Log out
             </button>
@@ -190,19 +190,19 @@ export default function Home() {
         ) : (
           <button
             onClick={() => setShowAuth(true)}
-            className="group w-full flex items-center gap-4 bg-[#130a0a] border border-[#ef4444]/20 hover:border-[#ef4444]/50 rounded-2xl px-5 py-4 transition-all duration-200 text-left"
+            className="group w-full flex items-center gap-4 bg-[#111] border border-[#222] hover:border-[#ef4444]/40 rounded-2xl px-5 py-4 transition-all duration-200 text-left"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/20 flex items-center justify-center shrink-0 text-[#ef4444] transition-colors">
+            <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/15 flex items-center justify-center shrink-0 text-[#ef4444] transition-colors">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                 <circle cx="9" cy="6" r="3.5"/>
                 <path d="M2 17c0-3.866 3.134-7 7-7s7 3.134 7 7H2z"/>
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black uppercase tracking-widest text-[#ef4444]">Sign In / Register</p>
-              <p className="text-xs text-[#5e1a1a] mt-0.5">Track your wins on the leaderboard</p>
+              <p className="text-sm font-black uppercase tracking-widest text-white">Sign In / Register</p>
+              <p className="text-xs text-[#555] mt-0.5">Track your wins on the leaderboard</p>
             </div>
-            <span className="text-[#ef4444]/40 group-hover:text-[#ef4444]/80 transition-colors">
+            <span className="text-[#444] group-hover:text-[#ef4444] transition-colors">
               <ChevronRight />
             </span>
           </button>
