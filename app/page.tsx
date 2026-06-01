@@ -158,10 +158,16 @@ export default function Home() {
                 <path d="M1.5 15c0-3.314 2.91-6 6.5-6s6.5 2.686 6.5 6H1.5z"/>
               </svg>
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-[#3b82f6] mb-0.5 truncate">{username}</p>
               <p className="text-[11px] text-[#1e3a5e] leading-tight">{userWins}W</p>
             </div>
+            <button
+              onClick={handleLogout}
+              className="text-[10px] font-bold uppercase tracking-wider text-[#333] hover:text-[#ef4444] transition-colors text-left"
+            >
+              Log out
+            </button>
           </div>
         ) : (
           <button
@@ -181,18 +187,6 @@ export default function Home() {
           </button>
         )}
       </div>
-
-      {/* Logged-in strip */}
-      {username && authChecked && (
-        <div className="w-full flex items-center justify-between mb-4 px-1">
-          <p className="text-xs text-[#333]">
-            Signed in as <span className="text-[#555]">{username}</span>
-          </p>
-          <button onClick={handleLogout} className="text-xs text-[#333] hover:text-[#666] transition-colors">
-            Log out
-          </button>
-        </div>
-      )}
 
       {/* Create battle */}
       <div className="w-full rounded-2xl border border-[#222] bg-[#0d0d0d] p-5 mb-3">
