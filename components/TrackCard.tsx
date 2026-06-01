@@ -76,7 +76,7 @@ export default function TrackCard({ track, player, playerName, isMe, onSetTrack,
           <input
             name="url"
             type="text"
-            placeholder="Paste Spotify link..."
+            placeholder="Paste Spotify or SoundCloud link..."
             className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-xs outline-none focus:border-[#444] transition-colors"
           />
           <button
