@@ -127,6 +127,26 @@ export default function Home() {
       {/* Nav rows */}
       <div className="w-full flex flex-col gap-2 mb-6">
 
+        {/* Chill Rooms */}
+        <Link
+          href="/chill"
+          className="group w-full flex items-center gap-4 bg-[#111] border border-[#222] hover:border-[#ef4444]/40 rounded-2xl px-5 py-4 transition-all duration-200"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/15 flex items-center justify-center shrink-0 text-[#ef4444] transition-colors">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="9" r="7"/>
+              <path d="M6 9h6M9 6v6"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black uppercase tracking-widest text-white">Chill Rooms</p>
+            <p className="text-xs text-[#555] mt-0.5">Hang out, queue music, chat</p>
+          </div>
+          <span className="text-[#444] group-hover:text-[#ef4444] transition-colors">
+            <ChevronRight />
+          </span>
+        </Link>
+
         {/* Lobbies */}
         <Link
           href="/lobbies"
