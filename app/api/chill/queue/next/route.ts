@@ -7,14 +7,14 @@ export async function POST(req: Request) {
   const db = createAdminClient()
 
   // Atomically mark current song as finished (only if still playing — prevents double-advance)
-  const { count } = await db
+  const { data: updated } = await db
     .from('chill_queue')
     .update({ status: 'finished' })
     .eq('id', currentId)
     .eq('status', 'playing')
-    .select('id', { count: 'exact', head: true })
+    .select('id')
 
-  if (!count) return Response.json({ success: true }) // already finished, no-op
+  if (!updated || updated.length === 0) return Response.json({ success: true }) // already finished, no-op
 
   // Advance to next waiting song
   const { data: next } = await db
