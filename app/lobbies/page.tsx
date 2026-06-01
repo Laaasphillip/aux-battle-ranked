@@ -43,11 +43,13 @@ export default function LobbiesPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    // Initial fetch — all non-finished battles, newest first
+    // Initial fetch — active battles from the last 30 minutes, newest first
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     supabase
       .from('battles')
       .select('code, status, player1_name, player2_name, created_at')
       .neq('status', 'finished')
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setLobbies((data as Lobby[]) ?? [])
@@ -63,7 +65,8 @@ export default function LobbiesPage() {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const b = payload.new as Lobby
-            if (b.status !== 'finished') {
+            const age = Date.now() - new Date(b.created_at).getTime()
+            if (b.status !== 'finished' && age < 30 * 60 * 1000) {
               setLobbies(prev => [b, ...prev])
             }
           } else if (payload.eventType === 'UPDATE') {

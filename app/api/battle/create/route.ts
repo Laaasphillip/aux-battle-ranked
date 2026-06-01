@@ -14,6 +14,14 @@ export async function POST(request: Request) {
 
   const db = createAdminClient()
 
+  // Expire abandoned waiting battles older than 30 minutes
+  const staleThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  await db
+    .from('battles')
+    .update({ status: 'finished', ended_at: new Date().toISOString() })
+    .eq('status', 'waiting')
+    .lt('created_at', staleThreshold)
+
   let player1UserId: string | null = null
   if (accessToken) {
     const { data: { user } } = await db.auth.getUser(accessToken)
