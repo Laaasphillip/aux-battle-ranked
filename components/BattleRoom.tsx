@@ -37,6 +37,8 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const [copied, setCopied] = useState(false)
   const battleEndedRef = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const scWidgetP1Ref = useRef<HTMLIFrameElement | null>(null)
+  const scWidgetP2Ref = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
     const role = localStorage.getItem(`auxbattle_role_${battle.code}`) as 'player1' | 'player2' | null
@@ -108,6 +110,25 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
 
     return () => { audio.pause() }
   }, [phase, audioReady, battle.player1_track?.previewUrl, battle.player2_track?.previewUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SoundCloud widget fallback — fires when Deezer had no preview for a SC track
+  useEffect(() => {
+    if (!audioReady || battle.status !== 'live' || !phase || phase === 'vote') return
+    const track = phase === 'p1' ? battle.player1_track : battle.player2_track
+    if (!track || track.previewUrl || !track.spotifyUrl?.includes('soundcloud.com')) return
+
+    const iframe = phase === 'p1' ? scWidgetP1Ref.current : scWidgetP2Ref.current
+    if (!iframe) return
+
+    const timer = setTimeout(() => {
+      iframe.contentWindow?.postMessage(JSON.stringify({ method: 'play' }), 'https://w.soundcloud.com')
+    }, 800)
+
+    return () => {
+      clearTimeout(timer)
+      iframe.contentWindow?.postMessage(JSON.stringify({ method: 'pause' }), 'https://w.soundcloud.com')
+    }
+  }, [phase, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stop audio when battle ends
   useEffect(() => {
@@ -448,6 +469,26 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
         >
           New Battle
         </button>
+      )}
+
+      {/* Hidden SoundCloud widget iframes — fallback audio for tracks not on Deezer */}
+      {battle.player1_track && !battle.player1_track.previewUrl && battle.player1_track.spotifyUrl?.includes('soundcloud.com') && (
+        <iframe
+          ref={scWidgetP1Ref}
+          src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(battle.player1_track.spotifyUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false`}
+          allow="autoplay"
+          aria-hidden
+          style={{ position: 'fixed', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      )}
+      {battle.player2_track && !battle.player2_track.previewUrl && battle.player2_track.spotifyUrl?.includes('soundcloud.com') && (
+        <iframe
+          ref={scWidgetP2Ref}
+          src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(battle.player2_track.spotifyUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false`}
+          allow="autoplay"
+          aria-hidden
+          style={{ position: 'fixed', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+        />
       )}
     </main>
   )

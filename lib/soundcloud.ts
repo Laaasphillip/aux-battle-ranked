@@ -1,14 +1,21 @@
-async function getDeezerPreview(trackName: string, artist: string): Promise<string | null> {
-  try {
-    const q = encodeURIComponent(`${trackName} ${artist.split(',')[0].trim()}`)
-    const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=5`)
-    if (!res.ok) return null
-    const data = await res.json()
-    const match = (data.data ?? []).find((t: { preview: string }) => t.preview)
-    return match?.preview ?? null
-  } catch {
-    return null
+async function getDeezerPreview(title: string, artist: string): Promise<string | null> {
+  // Try multiple queries in order — best match first
+  const queries = [
+    `${title} ${artist.split(',')[0].trim()}`,
+    title,
+  ]
+  for (const q of queries) {
+    try {
+      const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=10`)
+      if (!res.ok) continue
+      const data = await res.json()
+      const match = (data.data ?? []).find((t: { preview: string }) => t.preview)
+      if (match?.preview) return match.preview
+    } catch {
+      continue
+    }
   }
+  return null
 }
 
 export function parseSoundCloudUrl(input: string): string | null {
@@ -16,7 +23,6 @@ export function parseSoundCloudUrl(input: string): string | null {
     const url = new URL(input.trim())
     if (!url.hostname.endsWith('soundcloud.com')) return null
     const parts = url.pathname.split('/').filter(Boolean)
-    // Need artist + track slug; reject profiles, playlists, likes, etc.
     if (parts.length < 2 || parts[1] === 'sets' || parts[1] === 'likes' || parts[1] === 'following' || parts[1] === 'followers') return null
     return input.trim()
   } catch {
@@ -32,9 +38,16 @@ export async function getSoundCloudTrack(url: string) {
     if (!oEmbedRes.ok) return null
     const data = await oEmbedRes.json()
 
-    const title: string = data.title ?? ''
-    const artist: string = data.author_name ?? ''
+    let title: string = data.title ?? ''
+    let artist: string = data.author_name ?? ''
     const albumArt: string = data.thumbnail_url ?? ''
+
+    // SoundCloud titles often come as "Artist - Track Name" — split them for cleaner search
+    if (title.includes(' - ')) {
+      const [parsedArtist, ...rest] = title.split(' - ')
+      artist = parsedArtist.trim()
+      title = rest.join(' - ').trim()
+    }
 
     const previewUrl = await getDeezerPreview(title, artist)
 
