@@ -30,18 +30,30 @@ export default function AuthModal({ onClose, onAuth }: Props) {
         return
       }
 
-      const { data, error: err } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { username: trimmed } },
-      })
+      const { data, error: err } = await supabase.auth.signUp({ email, password })
 
       if (err) { setError(err.message); setLoading(false); return }
-      if (!data.session) {
+      if (!data.session || !data.user) {
         setError('Check your email to confirm your account, then log in.')
         setLoading(false)
         return
       }
+
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .insert({ id: data.user.id, username: trimmed })
+
+      if (profileErr) {
+        if (profileErr.code === '23505') {
+          setError('That username is already taken.')
+        } else {
+          setError('Failed to create profile: ' + profileErr.message)
+        }
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
       onAuth(trimmed)
     } else {
       const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
