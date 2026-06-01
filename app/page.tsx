@@ -88,12 +88,14 @@ export default function Home() {
 
         {/* Top bar */}
         <div className="flex items-center justify-between mb-8">
-          <Link
-            href="/leaderboard"
-            className="text-xs text-[#666] hover:text-white transition-colors uppercase tracking-widest"
-          >
-            Leaderboard
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/lobbies" className="text-xs text-[#666] hover:text-white transition-colors uppercase tracking-widest">
+              Lobbies
+            </Link>
+            <Link href="/leaderboard" className="text-xs text-[#666] hover:text-white transition-colors uppercase tracking-widest">
+              Leaderboard
+            </Link>
+          </div>
           {authChecked && (
             username ? (
               <div className="flex items-center gap-3">
