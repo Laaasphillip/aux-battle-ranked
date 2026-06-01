@@ -138,6 +138,19 @@ export default function ChillRoom({
       }
     )
 
+    // Delete room when last player leaves
+    channel.on('presence', { event: 'leave' }, () => {
+      const state = channel.presenceState()
+      if (Object.keys(state).length === 0) {
+        fetch('/api/chill/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: room.id }),
+          keepalive: true,
+        })
+      }
+    })
+
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myName, color: myColor, x: 50, y: 50 })
@@ -169,7 +182,6 @@ export default function ChillRoom({
 
     const audio = new Audio(currentSong.track.previewUrl)
     const elapsed = (Date.now() - new Date(currentSong.started_at).getTime()) / 1000
-    if (elapsed >= 29) { handleSongEnd(); return }
     audio.currentTime = Math.max(0, elapsed)
     audio.volume = volume
     audio.play().catch(() => {})
@@ -346,129 +358,87 @@ export default function ChillRoom({
             </button>
           )}
           <div
-            className="w-full h-full cursor-crosshair select-none relative"
-            style={{
-              backgroundImage: 'radial-gradient(circle, #1c1c1c 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-            }}
+            className="w-full h-full cursor-crosshair select-none relative overflow-hidden"
+            style={{ background: '#0c0c0e' }}
             onClick={handleWorldClick}
           >
-            {/* ── Room decorations ── */}
+            {/* Dot grid overlay */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: 'radial-gradient(circle, #1e1e22 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+            }} />
 
-            {/* Stage (top-center) */}
-            <div className="absolute pointer-events-none flex flex-col items-center justify-center gap-1.5"
-              style={{ left: '28%', top: '4%', width: '44%', height: '20%' }}>
-              <div className="w-full h-full rounded-2xl border border-[#ef4444]/25 bg-[#110808] flex flex-col items-center justify-center gap-1.5"
-                style={{ boxShadow: 'inset 0 0 30px #ef444408' }}>
-                <p className="text-[8px] font-black uppercase tracking-widest text-[#ef4444]/40">Stage</p>
-                <div className="flex items-end gap-0.5">
-                  {[5, 10, 7, 12, 8, 11, 6, 9, 5].map((h, i) => (
-                    <div key={i} className="w-1 rounded-sm" style={{
-                      height: `${currentSong ? h + Math.sin(Date.now() / 300 + i) * 3 : 3}px`,
-                      background: '#ef4444',
-                      opacity: currentSong ? 0.5 : 0.15,
-                    }} />
-                  ))}
-                </div>
-              </div>
-            </div>
+            {/* Ambient corner lights */}
+            <div className="absolute pointer-events-none" style={{ left: '-8%', top: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)' }} />
+            <div className="absolute pointer-events-none" style={{ right: '-8%', top: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%)' }} />
+            <div className="absolute pointer-events-none" style={{ left: '-8%', bottom: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)' }} />
+            <div className="absolute pointer-events-none" style={{ right: '-8%', bottom: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%)' }} />
 
-            {/* Round table — left */}
-            <div className="absolute pointer-events-none"
-              style={{ left: '14%', top: '52%', transform: 'translate(-50%, -50%)' }}>
-              <div className="w-14 h-14 rounded-full border border-[#252525] bg-[#111] flex items-center justify-center"
-                style={{ boxShadow: '0 2px 8px #00000060' }}>
-                <div className="w-5 h-5 rounded-full bg-[#161616] border border-[#222]" />
-              </div>
-              {/* Seats */}
-              {[0, 90, 180, 270].map(deg => (
-                <div key={deg} className="absolute w-3 h-3 rounded-full bg-[#1a1a1a] border border-[#2a2a2a]"
-                  style={{
-                    left: `calc(50% + ${Math.cos((deg * Math.PI) / 180) * 32}px - 6px)`,
-                    top: `calc(50% + ${Math.sin((deg * Math.PI) / 180) * 32}px - 6px)`,
-                  }} />
-              ))}
-            </div>
+            {/* Central dancefloor glow */}
+            <div className="absolute pointer-events-none" style={{
+              left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '30%', height: '30%',
+              background: 'radial-gradient(circle, rgba(239,68,68,0.04) 0%, transparent 70%)',
+              border: '1px solid rgba(255,255,255,0.02)',
+              borderRadius: '50%',
+            }} />
 
-            {/* Round table — right */}
-            <div className="absolute pointer-events-none"
-              style={{ left: '83%', top: '52%', transform: 'translate(-50%, -50%)' }}>
-              <div className="w-14 h-14 rounded-full border border-[#252525] bg-[#111] flex items-center justify-center"
-                style={{ boxShadow: '0 2px 8px #00000060' }}>
-                <div className="w-5 h-5 rounded-full bg-[#161616] border border-[#222]" />
-              </div>
-              {[0, 90, 180, 270].map(deg => (
-                <div key={deg} className="absolute w-3 h-3 rounded-full bg-[#1a1a1a] border border-[#2a2a2a]"
-                  style={{
-                    left: `calc(50% + ${Math.cos((deg * Math.PI) / 180) * 32}px - 6px)`,
-                    top: `calc(50% + ${Math.sin((deg * Math.PI) / 180) * 32}px - 6px)`,
-                  }} />
-              ))}
-            </div>
-
-            {/* Lounge / couch (bottom-center) */}
-            <div className="absolute pointer-events-none flex items-center justify-center"
-              style={{ left: '28%', top: '78%', width: '44%', height: '11%' }}>
-              <div className="w-full h-full rounded-2xl border border-[#222] bg-[#0f0f0f] flex items-center justify-center"
-                style={{ boxShadow: 'inset 0 0 20px #00000040' }}>
-                <p className="text-[8px] text-[#222] uppercase tracking-widest font-black">Lounge</p>
-              </div>
-            </div>
-
-            {/* Corner plants */}
-            {[{ l: '2%', t: '2%' }, { l: '95%', t: '2%' }, { l: '2%', t: '88%' }, { l: '95%', t: '88%' }].map((pos, i) => (
-              <div key={i} className="absolute pointer-events-none w-5 h-5 rounded-full border border-[#1a2f1a]"
-                style={{ left: pos.l, top: pos.t, background: '#0a140a' }} />
-            ))}
-
-            {/* ── Click ripple ── */}
+            {/* Click ripple */}
             {clickTarget && (
-              <div
-                key={clickTarget.t}
-                className="absolute pointer-events-none"
-                style={{ left: `${clickTarget.x}%`, top: `${clickTarget.y}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="w-8 h-8 rounded-full border border-white/30 animate-ping" />
+              <div key={clickTarget.t} className="absolute pointer-events-none"
+                style={{ left: `${clickTarget.x}%`, top: `${clickTarget.y}%`, transform: 'translate(-50%, -50%)' }}>
+                <div className="w-8 h-8 rounded-full border border-white/25 animate-ping" />
               </div>
             )}
 
-            {/* ── Players ── */}
-            {Object.values(players).map(player => (
-              <div
-                key={player.id}
-                className="absolute pointer-events-none"
+            {/* Other players (from presence) */}
+            {Object.values(players).filter(p => p.id !== myId).map(player => (
+              <div key={player.id} className="absolute pointer-events-none"
                 style={{
-                  left: `${player.x}%`,
-                  top: `${player.y}%`,
+                  left: `${player.x}%`, top: `${player.y}%`,
                   transform: 'translate(-50%, -50%)',
-                  transition: player.id === myId ? 'left 0.18s ease, top 0.18s ease' : 'left 0.35s ease, top 0.35s ease',
-                  zIndex: player.id === myId ? 10 : 5,
-                }}
-              >
-                {/* Outer glow ring */}
-                <div className="absolute inset-0 rounded-full opacity-40"
-                  style={{ background: player.color, filter: 'blur(6px)', transform: 'scale(1.4)' }} />
-                {/* Avatar */}
-                <div
-                  className="w-11 h-11 rounded-full relative mx-auto"
+                  transition: 'left 0.35s ease, top 0.35s ease',
+                  zIndex: 5,
+                }}>
+                <div className="absolute inset-0 rounded-full" style={{ background: player.color, filter: 'blur(8px)', transform: 'scale(1.5)', opacity: 0.3 }} />
+                <div className="w-11 h-11 rounded-full relative mx-auto"
                   style={{
-                    background: `radial-gradient(circle at 35% 35%, ${player.color}dd, ${player.color}88)`,
-                    border: player.id === myId ? '2px solid rgba(255,255,255,0.6)' : '2px solid rgba(255,255,255,0.15)',
-                    boxShadow: `0 4px 12px ${player.color}50`,
-                  }}
-                >
-                  {/* Shine */}
-                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/30" />
+                    background: `radial-gradient(circle at 35% 35%, ${player.color}ee, ${player.color}99)`,
+                    border: '2px solid rgba(255,255,255,0.12)',
+                    boxShadow: `0 4px 14px ${player.color}50`,
+                  }}>
+                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/25" />
                 </div>
-                {/* Name tag */}
-                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm mx-auto w-fit">
-                  <p className="text-[9px] font-bold whitespace-nowrap"
-                    style={{ color: player.id === myId ? 'white' : '#ccc' }}>
-                    {player.username}{player.id === myId ? ' ▪' : ''}
-                  </p>
+                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/70 mx-auto w-fit">
+                  <p className="text-[9px] font-bold text-[#ccc] whitespace-nowrap">{player.username}</p>
                 </div>
               </div>
             ))}
+
+            {/* My character (from myPos — instant response) */}
+            {myId && (
+              <div className="absolute pointer-events-none"
+                style={{
+                  left: `${myPos.x}%`, top: `${myPos.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  transition: 'left 0.18s ease, top 0.18s ease',
+                  zIndex: 10,
+                }}>
+                <div className="absolute inset-0 rounded-full" style={{ background: myColor, filter: 'blur(10px)', transform: 'scale(1.6)', opacity: 0.4 }} />
+                <div className="w-11 h-11 rounded-full relative mx-auto"
+                  style={{
+                    background: `radial-gradient(circle at 35% 35%, ${myColor}ff, ${myColor}bb)`,
+                    border: '2px solid rgba(255,255,255,0.55)',
+                    boxShadow: `0 4px 16px ${myColor}70`,
+                  }}>
+                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/35" />
+                </div>
+                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/70 mx-auto w-fit">
+                  <p className="text-[9px] font-bold text-white whitespace-nowrap">{myName} ▪</p>
+                </div>
+              </div>
+            )}
           </div>
           <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#1e1e1e] pointer-events-none select-none">
             Click anywhere to move

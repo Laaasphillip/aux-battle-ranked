@@ -307,6 +307,8 @@ export default function Home() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={handleAuthSuccess} />}
+
+      <p className="mt-8 text-[10px] text-[#282828] uppercase tracking-widest select-none">Created by neveragaxn</p>
     </main>
   )
 }
