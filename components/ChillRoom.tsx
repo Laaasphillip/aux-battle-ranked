@@ -75,12 +75,15 @@ export default function ChillRoom({
   const [clickTarget, setClickTarget] = useState<{ x: number; y: number; t: number } | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const playerCountRef = useRef(0)
 
   const currentSong = queue.find(q => q.status === 'playing') ?? null
   const waitingQueue = queue.filter(q => q.status === 'waiting')
+
+  const isSCTrack = !!(currentSong?.track.spotifyUrl?.includes('soundcloud.com'))
 
   // Init identity
   useEffect(() => {
@@ -168,17 +171,16 @@ export default function ChillRoom({
     }
   }, [myId, room.id])
 
-  // Audio — plays from start to finish, auto-advances queue when done
+  // Deezer/Spotify preview audio (non-SoundCloud tracks)
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
 
-    if (!audioReady || !currentSong) return
+    if (!audioReady || !currentSong || isSCTrack) return
 
     const songId = currentSong.id
     const roomId = room.id
 
-    // No preview URL — skip this entry automatically
     if (!currentSong.track.previewUrl) {
       const t = setTimeout(() => {
         fetch('/api/chill/queue/next', {
@@ -191,23 +193,80 @@ export default function ChillRoom({
     }
 
     const audio = new Audio(currentSong.track.previewUrl)
-    audio.currentTime = 0
     audio.volume = volume
-    audio.onended = () => {
+
+    const advance = () => {
       fetch('/api/chill/queue/next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, currentId: songId }),
       })
     }
-    audio.play().catch(err => console.warn('Chill audio play failed:', err))
+
+    audio.addEventListener('canplaythrough', () => {
+      audio.currentTime = 0
+      audio.play().catch(() => {})
+    }, { once: true })
+    audio.onended = advance
+    audio.load()
     audioRef.current = audio
 
     return () => {
       audio.onended = null
       audio.pause()
     }
-  }, [currentSong?.id, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSong?.id, audioReady, isSCTrack]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SoundCloud widget control — full track playback for SC links
+  useEffect(() => {
+    if (!audioReady || !currentSong || !isSCTrack) return
+
+    const songId = currentSong.id
+    const roomId = room.id
+    const iframe = scWidgetRef.current
+    if (!iframe) return
+
+    // Give the iframe time to load, then subscribe to events and play
+    const timer = setTimeout(() => {
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'addEventListener', value: 'finish' }),
+        'https://w.soundcloud.com'
+      )
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'seekTo', value: 0 }),
+        'https://w.soundcloud.com'
+      )
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'play' }),
+        'https://w.soundcloud.com'
+      )
+    }, 1500)
+
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== 'https://w.soundcloud.com') return
+      try {
+        const data = JSON.parse(e.data as string)
+        if (data.method === 'finish') {
+          fetch('/api/chill/queue/next', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId, currentId: songId }),
+          })
+        }
+      } catch { /* ignore non-JSON messages */ }
+    }
+
+    window.addEventListener('message', onMessage)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('message', onMessage)
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'pause' }),
+        'https://w.soundcloud.com'
+      )
+    }
+  }, [currentSong?.id, audioReady, isSCTrack]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll chat
   useEffect(() => {
@@ -577,6 +636,18 @@ export default function ChillRoom({
           </div>
         </div>
       </div>
+
+      {/* Hidden SoundCloud widget — full track playback for SC links */}
+      {currentSong && isSCTrack && (
+        <iframe
+          key={currentSong.id}
+          ref={scWidgetRef}
+          src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(currentSong.track.spotifyUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false`}
+          allow="autoplay"
+          aria-hidden
+          style={{ position: 'fixed', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      )}
     </div>
   )
 }
