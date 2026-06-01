@@ -144,10 +144,11 @@ export default function Home() {
             type="text"
             placeholder="Your name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => !username && setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && createBattle()}
             maxLength={24}
-            className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#444] transition-colors mb-3"
+            readOnly={!!username}
+            className={`w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm outline-none transition-colors mb-3 ${username ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#444]'}`}
           />
           <button
             onClick={createBattle}

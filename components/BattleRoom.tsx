@@ -26,6 +26,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   const [battle, setBattle] = useState<Battle>(initialBattle)
   const [myRole, setMyRole] = useState<'player1' | 'player2' | 'voter'>('voter')
   const [joinName, setJoinName] = useState('')
+  const [loggedInUsername, setLoggedInUsername] = useState<string | null>(null)
   const [joining, setJoining] = useState(false)
   const [trackLoading, setTrackLoading] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -48,6 +49,20 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
       setHasVoted(true)
       setVotedFor(Number(voted) as 1 | 2)
     }
+
+    // Lock join name to account username if logged in
+    createClient().auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return
+      const { data: profile } = await createClient()
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .single()
+      if (profile?.username) {
+        setLoggedInUsername(profile.username)
+        setJoinName(profile.username)
+      }
+    })
   }, [battle.code])
 
   // Realtime subscription
@@ -350,10 +365,11 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
               type="text"
               placeholder="Your name"
               value={joinName}
-              onChange={(e) => setJoinName(e.target.value)}
+              onChange={(e) => !loggedInUsername && setJoinName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
               maxLength={24}
-              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#444] transition-colors"
+              readOnly={!!loggedInUsername}
+              className={`flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${loggedInUsername ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#444]'}`}
             />
             <button
               onClick={handleJoin}
