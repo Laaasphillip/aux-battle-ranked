@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
-  const { code, playerName } = await request.json()
+  const { code, playerName, accessToken } = await request.json()
 
   if (!code || !playerName?.trim()) {
     return Response.json({ error: 'Code and player name are required' }, { status: 400 })
@@ -27,9 +27,15 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Battle has already started' }, { status: 409 })
   }
 
+  let player2UserId: string | null = null
+  if (accessToken) {
+    const { data: { user } } = await db.auth.getUser(accessToken)
+    if (user) player2UserId = user.id
+  }
+
   const { error } = await db
     .from('battles')
-    .update({ player2_name: playerName.trim() })
+    .update({ player2_name: playerName.trim(), player2_user_id: player2UserId })
     .eq('code', code)
 
   if (error) {

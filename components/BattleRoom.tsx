@@ -152,10 +152,15 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
   async function handleJoin() {
     if (!joinName.trim()) return
     setJoining(true)
+    const { data: { session } } = await createClient().auth.getSession()
     const res = await fetch('/api/battle/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: battle.code, playerName: joinName.trim() }),
+      body: JSON.stringify({
+        code: battle.code,
+        playerName: joinName.trim(),
+        accessToken: session?.access_token ?? null,
+      }),
     })
     if (res.ok) {
       localStorage.setItem(`auxbattle_role_${battle.code}`, 'player2')

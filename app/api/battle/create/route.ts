@@ -6,13 +6,19 @@ function generateCode(): string {
 }
 
 export async function POST(request: Request) {
-  const { playerName } = await request.json()
+  const { playerName, accessToken } = await request.json()
 
   if (!playerName?.trim()) {
     return Response.json({ error: 'Player name is required' }, { status: 400 })
   }
 
   const db = createAdminClient()
+
+  let player1UserId: string | null = null
+  if (accessToken) {
+    const { data: { user } } = await db.auth.getUser(accessToken)
+    if (user) player1UserId = user.id
+  }
 
   let code = generateCode()
   let attempts = 0
@@ -21,6 +27,7 @@ export async function POST(request: Request) {
     const { error } = await db.from('battles').insert({
       code,
       player1_name: playerName.trim(),
+      player1_user_id: player1UserId,
       vote_duration: 70,
     })
 
