@@ -104,10 +104,9 @@ export default function Home() {
             {lobbyCount === null ? '...' : lobbyCount === 0 ? 'No active battles' : `${lobbyCount} battle${lobbyCount === 1 ? '' : 's'} live now`}
           </span>
         </div>
-        <h1 className="text-5xl font-black tracking-tighter uppercase leading-none mb-3">
-          <span className="text-white">Aux</span>
-          <span className="text-[#ef4444]"> Battle</span>
-          <br />
+        <h1 className="text-3xl font-black tracking-tight uppercase whitespace-nowrap mb-3">
+          <span className="text-white">Aux </span>
+          <span className="text-[#ef4444]">Battle </span>
           <span className="text-white">Ranked</span>
         </h1>
         <p className="text-[#444] text-sm">Drop your track. Let the crowd decide.</p>
@@ -118,8 +117,12 @@ export default function Home() {
 
         {/* Lobbies */}
         <Link href="/lobbies" className="group flex flex-col gap-3 rounded-2xl p-4 border transition-all duration-200 bg-[#0a130b] border-[#22c55e]/20 hover:border-[#22c55e]/60 hover:bg-[#0c1a0d]">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl bg-[#22c55e]/10 group-hover:bg-[#22c55e]/20 transition-colors">
-            🎮
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#22c55e]/10 group-hover:bg-[#22c55e]/20 transition-colors text-[#22c55e]">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="2" width="9" height="12" rx="1.5"/>
+              <path d="M11 8h4M13 6l2 2-2 2"/>
+              <circle cx="7" cy="8" r="1" fill="currentColor" stroke="none"/>
+            </svg>
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-[#22c55e] mb-0.5">Lobbies</p>
@@ -131,8 +134,12 @@ export default function Home() {
 
         {/* Leaderboard */}
         <Link href="/leaderboard" className="group flex flex-col gap-3 rounded-2xl p-4 border transition-all duration-200 bg-[#130f00] border-[#fbbf24]/20 hover:border-[#fbbf24]/60 hover:bg-[#1a1300]">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl bg-[#fbbf24]/10 group-hover:bg-[#fbbf24]/20 transition-colors">
-            🏆
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#fbbf24]/10 group-hover:bg-[#fbbf24]/20 transition-colors text-[#fbbf24]">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="1" y="9" width="4" height="6" rx="0.75"/>
+              <rect x="6" y="4" width="4" height="11" rx="0.75"/>
+              <rect x="11" y="6" width="4" height="9" rx="0.75"/>
+            </svg>
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-[#fbbf24] mb-0.5">Rankings</p>
@@ -145,8 +152,11 @@ export default function Home() {
           <div className="flex flex-col gap-3 rounded-2xl p-4 border bg-[#111] border-[#1a1a1a]" />
         ) : username ? (
           <div className="flex flex-col gap-3 rounded-2xl p-4 border bg-[#0a0f1a] border-[#3b82f6]/20">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl bg-[#3b82f6]/10">
-              ⚡
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#3b82f6]/10 text-[#3b82f6]">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="5" r="3"/>
+                <path d="M1.5 15c0-3.314 2.91-6 6.5-6s6.5 2.686 6.5 6H1.5z"/>
+              </svg>
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest text-[#3b82f6] mb-0.5 truncate">{username}</p>
@@ -158,8 +168,11 @@ export default function Home() {
             onClick={() => setShowAuth(true)}
             className="group flex flex-col gap-3 rounded-2xl p-4 border transition-all duration-200 bg-[#130a0a] border-[#ef4444]/20 hover:border-[#ef4444]/60 hover:bg-[#1a0c0c] text-left w-full"
           >
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl bg-[#ef4444]/10 group-hover:bg-[#ef4444]/20 transition-colors">
-              🔥
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#ef4444]/10 group-hover:bg-[#ef4444]/20 transition-colors text-[#ef4444]">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="5" r="3"/>
+                <path d="M1.5 15c0-3.314 2.91-6 6.5-6s6.5 2.686 6.5 6H1.5z"/>
+              </svg>
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-[#ef4444] mb-0.5">Sign In</p>
