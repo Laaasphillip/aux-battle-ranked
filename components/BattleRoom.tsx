@@ -97,7 +97,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     if (phase === 'vote') return
 
     const track: SpotifyTrack | null =
-      phase === 'p1' ? initialBattle.player1_track : initialBattle.player2_track
+      phase === 'p1' ? battle.player1_track : battle.player2_track
     if (!track?.previewUrl) return
 
     const audio = new Audio(track.previewUrl)
@@ -107,7 +107,7 @@ export default function BattleRoom({ initialBattle }: { initialBattle: Battle })
     audioRef.current = audio
 
     return () => { audio.pause() }
-  }, [phase, audioReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, audioReady, battle.player1_track?.previewUrl, battle.player2_track?.previewUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stop audio when battle ends
   useEffect(() => {
