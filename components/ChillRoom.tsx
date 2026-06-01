@@ -181,8 +181,7 @@ export default function ChillRoom({
     audioRef.current?.pause()
 
     const audio = new Audio(currentSong.track.previewUrl)
-    const elapsed = (Date.now() - new Date(currentSong.started_at).getTime()) / 1000
-    audio.currentTime = Math.max(0, elapsed)
+    audio.currentTime = 0
     audio.volume = volume
     audio.play().catch(() => {})
     audio.addEventListener('ended', handleSongEnd)
