@@ -70,6 +70,11 @@ export async function getTrack(trackId: string) {
     previewUrl = await getDeezerPreview(trackName, artist)
   }
 
+  // YouTube search embed — same technique Discord music bots use:
+  // resolve Spotify metadata, then search YouTube for the full track
+  const ytQuery = encodeURIComponent(`${trackName} ${artist.split(',')[0].trim()} audio`)
+  const fullTrackUrl = `https://www.youtube.com/embed?listType=search&list=${ytQuery}&enablejsapi=1`
+
   return {
     id: data.id,
     name: trackName,
@@ -79,5 +84,6 @@ export async function getTrack(trackId: string) {
     previewUrl,
     spotifyUrl: data.external_urls.spotify,
     durationMs: data.duration_ms,
+    fullTrackUrl,
   }
 }

@@ -85,6 +85,7 @@ export default function ChillRoom({
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
+  const ytWidgetRef = useRef<HTMLIFrameElement | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const playerCountRef = useRef(0)
@@ -94,6 +95,7 @@ export default function ChillRoom({
   const waitingQueue = queue.filter(q => q.status === 'waiting')
 
   const isSCTrack = !!(currentSong?.track.fullTrackUrl?.includes('soundcloud.com'))
+  const isYTTrack = !!(currentSong?.track.fullTrackUrl?.includes('youtube.com'))
   const isSpotifyTrack = !!(currentSong?.track.spotifyUrl?.includes('open.spotify.com'))
 
   // Restore guest display name from localStorage
@@ -240,7 +242,7 @@ export default function ChillRoom({
     audioRef.current?.pause()
     audioRef.current = null
 
-    if (!audioReady || !currentSong || isSCTrack) return
+    if (!audioReady || !currentSong || isSCTrack || isYTTrack) return
 
     const songId = currentSong.id
     const roomId = room.id
@@ -340,6 +342,64 @@ export default function ChillRoom({
     }
   }, [currentSong?.id, audioReady, isSCTrack]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // YouTube widget — full track playback for Spotify links via YouTube search
+  useEffect(() => {
+    if (!audioReady || !currentSong || !isYTTrack) return
+
+    const songId = currentSong.id
+    const roomId = room.id
+    const durationMs = currentSong.track.durationMs ?? 0
+    let advanced = false
+
+    const advance = () => {
+      if (advanced) return
+      advanced = true
+      fetch('/api/chill/queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, currentId: songId }),
+      })
+    }
+
+    // Primary: duration-based timer using Spotify's exact track length
+    const timer = durationMs > 10000
+      ? setTimeout(advance, durationMs - 3000)
+      : setTimeout(advance, 30000)
+
+    // Secondary: YouTube IFrame API end-of-video event (state 0 = ended)
+    const onMessage = (e: MessageEvent) => {
+      if (!e.origin.includes('youtube.com')) return
+      try {
+        const data = JSON.parse(e.data as string)
+        if (data.event === 'onStateChange' && data.info === 0) advance()
+      } catch { /* non-JSON */ }
+    }
+    window.addEventListener('message', onMessage)
+
+    // Play + set volume after iframe loads
+    const playTimer = setTimeout(() => {
+      ytWidgetRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(volume * 100)] }),
+        'https://www.youtube.com'
+      )
+      ytWidgetRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+        'https://www.youtube.com'
+      )
+    }, 2000)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(playTimer)
+      window.removeEventListener('message', onMessage)
+      advanced = true
+      ytWidgetRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'stopVideo', args: [] }),
+        'https://www.youtube.com'
+      )
+    }
+  }, [currentSong?.id, audioReady, isYTTrack]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -349,10 +409,16 @@ export default function ChillRoom({
     // Deezer audio element
     if (audioRef.current) audioRef.current.volume = volume
 
-    // SC widget iframe (0–100 scale)
+    // SC widget (0–100 scale)
     scWidgetRef.current?.contentWindow?.postMessage(
       JSON.stringify({ method: 'setVolume', value: Math.round(volume * 100) }),
       'https://w.soundcloud.com'
+    )
+
+    // YouTube widget (0–100 scale)
+    ytWidgetRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(volume * 100)] }),
+      'https://www.youtube.com'
     )
   }, [volume])
 
@@ -750,6 +816,7 @@ export default function ChillRoom({
       </div>
 
       {/* Hidden SoundCloud widget — full track playback for SC links */}
+      {/* Hidden SoundCloud widget */}
       {currentSong && isSCTrack && currentSong.track.fullTrackUrl && (
         <iframe
           key={currentSong.id}
@@ -758,6 +825,18 @@ export default function ChillRoom({
           allow="autoplay"
           aria-hidden
           style={{ position: 'fixed', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      )}
+
+      {/* Hidden YouTube widget — full track via search (Spotify links) */}
+      {currentSong && isYTTrack && currentSong.track.fullTrackUrl && (
+        <iframe
+          key={currentSong.id}
+          ref={ytWidgetRef}
+          src={currentSong.track.fullTrackUrl}
+          allow="autoplay; encrypted-media"
+          aria-hidden
+          style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
         />
       )}
     </div>
