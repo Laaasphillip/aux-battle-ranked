@@ -30,49 +30,28 @@ export function parseSoundCloudUrl(input: string): string | null {
   }
 }
 
-export async function getSoundCloudTrack(url: string) {
-  // Derive title/artist from URL slug first — this never fails
-  let title = ''
-  let artist = ''
-  let albumArt = ''
+export async function getSoundCloudTrack(
+  url: string,
+  clientMeta?: { title?: string; artist?: string; albumArt?: string }
+) {
+  let title = clientMeta?.title ?? ''
+  let artist = clientMeta?.artist ?? ''
+  let albumArt = clientMeta?.albumArt ?? ''
 
-  try {
-    const u = new URL(url)
-    const parts = u.pathname.split('/').filter(Boolean)
-    artist = parts[0] ?? 'SoundCloud'
-    title = (parts[1] ?? 'Track')
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase())
-  } catch {
-    return null
-  }
-
-  // Try oEmbed to get better metadata — 5s timeout, never blocks resolution
-  try {
-    const controller = new AbortController()
-    const t = setTimeout(() => controller.abort(), 5000)
-    const res = await fetch(
-      `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`,
-      { signal: controller.signal }
-    )
-    clearTimeout(t)
-    if (res.ok) {
-      const data = await res.json()
-      const rawTitle: string = data.title ?? ''
-      const rawArtist: string = data.author_name ?? ''
-      albumArt = data.thumbnail_url ?? ''
-      if (rawTitle) {
-        if (rawTitle.includes(' - ')) {
-          const [a, ...rest] = rawTitle.split(' - ')
-          artist = a.trim()
-          title = rest.join(' - ').trim()
-        } else {
-          title = rawTitle
-          if (rawArtist) artist = rawArtist
-        }
-      }
+  // If the browser already fetched oEmbed metadata, use it directly
+  if (!title) {
+    // Derive from URL slug as fallback — SC oEmbed 403s from Vercel server IPs
+    try {
+      const u = new URL(url)
+      const parts = u.pathname.split('/').filter(Boolean)
+      artist = parts[0] ?? 'SoundCloud'
+      title = (parts[1] ?? 'Track')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase())
+    } catch {
+      return null
     }
-  } catch { /* oEmbed timed out or failed — use URL-derived info */ }
+  }
 
   const previewUrl = await getDeezerPreview(title, artist)
 

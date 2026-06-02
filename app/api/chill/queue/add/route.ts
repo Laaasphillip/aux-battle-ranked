@@ -3,7 +3,7 @@ import { parseSpotifyTrackId, getTrack } from '@/lib/spotify'
 import { parseSoundCloudUrl, getSoundCloudTrack } from '@/lib/soundcloud'
 
 export async function POST(req: Request) {
-  const { roomId, url, username, userId } = await req.json()
+  const { roomId, url, username, userId, scMeta } = await req.json()
   if (!roomId || !url || !username) {
     return Response.json({ error: 'Missing fields' }, { status: 400 })
   }
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     track = await getTrack(spotifyId)
   } else {
     const scUrl = parseSoundCloudUrl(url)
-    if (scUrl) track = await getSoundCloudTrack(scUrl)
+    if (scUrl) track = await getSoundCloudTrack(scUrl, scMeta)
   }
 
   if (!track) return Response.json({ error: 'Could not resolve track. Paste a Spotify or SoundCloud link.' }, { status: 400 })

@@ -393,10 +393,34 @@ export default function ChillRoom({
     if (!urlInput.trim() || !myName || resolving) return
     setResolving(true)
     setAddError('')
+
+    // Fetch SC oEmbed from the browser — server-to-server requests get 403'd by SC
+    let scMeta: { title?: string; artist?: string; albumArt?: string } | undefined
+    const trimmed = urlInput.trim()
+    if (trimmed.includes('soundcloud.com')) {
+      try {
+        const oe = await fetch(
+          `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(trimmed)}`,
+          { signal: AbortSignal.timeout(5000) }
+        )
+        if (oe.ok) {
+          const d = await oe.json()
+          let title: string = d.title ?? ''
+          let artist: string = d.author_name ?? ''
+          if (title.includes(' - ')) {
+            const [a, ...rest] = title.split(' - ')
+            artist = a.trim()
+            title = rest.join(' - ').trim()
+          }
+          scMeta = { title, artist, albumArt: d.thumbnail_url ?? '' }
+        }
+      } catch { /* fall through — server will derive from URL slug */ }
+    }
+
     const res = await fetch('/api/chill/queue/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId: room.id, url: urlInput.trim(), username: myName, userId: null }),
+      body: JSON.stringify({ roomId: room.id, url: trimmed, username: myName, userId: null, scMeta }),
     })
     setResolving(false)
     if (res.ok) {
