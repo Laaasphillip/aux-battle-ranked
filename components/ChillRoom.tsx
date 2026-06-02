@@ -325,6 +325,10 @@ export default function ChillRoom({
         'https://w.soundcloud.com'
       )
       iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'setVolume', value: Math.round(volume * 100) }),
+        'https://w.soundcloud.com'
+      )
+      iframe.contentWindow?.postMessage(
         JSON.stringify({ method: 'seekTo', value: 0 }),
         'https://w.soundcloud.com'
       )
@@ -360,7 +364,17 @@ export default function ChillRoom({
   }, [messages])
 
   useEffect(() => {
+    // Deezer audio element
     if (audioRef.current) audioRef.current.volume = volume
+
+    // SC widget iframe (0–100 scale)
+    scWidgetRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ method: 'setVolume', value: Math.round(volume * 100) }),
+      'https://w.soundcloud.com'
+    )
+
+    // Spotify IFrame controller (0–1 scale)
+    spotifyControllerRef.current?.setVolume?.(volume)
   }, [volume])
 
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
