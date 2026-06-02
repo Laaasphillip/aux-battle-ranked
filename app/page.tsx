@@ -41,6 +41,7 @@ export default function Home() {
           setName(profile.username)
           setUserWins(profile.wins ?? 0)
           setUserElo(profile.elo ?? 500)
+          localStorage.setItem('auxbattle_username', profile.username)
         }
       }
       setAuthChecked(true)
@@ -61,12 +62,14 @@ export default function Home() {
     setName('')
     setUserWins(0)
     setUserElo(500)
+    localStorage.removeItem('auxbattle_username')
   }
 
   function handleAuthSuccess(uname: string) {
     setUsername(uname)
     setName(uname)
     setShowAuth(false)
+    localStorage.setItem('auxbattle_username', uname)
   }
 
   async function createBattle() {

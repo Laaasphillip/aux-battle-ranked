@@ -31,41 +31,48 @@ export function parseSoundCloudUrl(input: string): string | null {
 }
 
 export async function getSoundCloudTrack(url: string) {
+  // Derive title/artist from URL slug first — this never fails
   let title = ''
   let artist = ''
   let albumArt = ''
 
   try {
-    const oEmbedRes = await fetch(
-      `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`
+    const u = new URL(url)
+    const parts = u.pathname.split('/').filter(Boolean)
+    artist = parts[0] ?? 'SoundCloud'
+    title = (parts[1] ?? 'Track')
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase())
+  } catch {
+    return null
+  }
+
+  // Try oEmbed to get better metadata — 5s timeout, never blocks resolution
+  try {
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 5000)
+    const res = await fetch(
+      `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`,
+      { signal: controller.signal }
     )
-    if (oEmbedRes.ok) {
-      const data = await oEmbedRes.json()
-      title = data.title ?? ''
-      artist = data.author_name ?? ''
+    clearTimeout(t)
+    if (res.ok) {
+      const data = await res.json()
+      const rawTitle: string = data.title ?? ''
+      const rawArtist: string = data.author_name ?? ''
       albumArt = data.thumbnail_url ?? ''
-      // SoundCloud titles often come as "Artist - Track Name" — split for cleaner search
-      if (title.includes(' - ')) {
-        const [parsedArtist, ...rest] = title.split(' - ')
-        artist = parsedArtist.trim()
-        title = rest.join(' - ').trim()
+      if (rawTitle) {
+        if (rawTitle.includes(' - ')) {
+          const [a, ...rest] = rawTitle.split(' - ')
+          artist = a.trim()
+          title = rest.join(' - ').trim()
+        } else {
+          title = rawTitle
+          if (rawArtist) artist = rawArtist
+        }
       }
     }
-  } catch { /* fall through to URL-derived info */ }
-
-  // oEmbed failed or returned no title — derive basic info from the URL slug
-  if (!title) {
-    try {
-      const u = new URL(url)
-      const parts = u.pathname.split('/').filter(Boolean)
-      artist = parts[0] ?? 'SoundCloud'
-      title = (parts[1] ?? 'Track')
-        .replace(/-/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase())
-    } catch {
-      return null
-    }
-  }
+  } catch { /* oEmbed timed out or failed — use URL-derived info */ }
 
   const previewUrl = await getDeezerPreview(title, artist)
 
