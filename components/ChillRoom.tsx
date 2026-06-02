@@ -304,7 +304,7 @@ export default function ChillRoom({
     }
   }, [currentSong?.id, audioReady, isSCTrack]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // SoundCloud widget control — full track playback for SC direct links and Spotify-searched-on-SC
+  // SoundCloud widget — full track playback for direct SC links
   useEffect(() => {
     if (!audioReady || !currentSong || !isSCTrack) return
 
@@ -313,12 +313,7 @@ export default function ChillRoom({
     const iframe = scWidgetRef.current
     if (!iframe) return
 
-    // For search-URL embeds (Spotify tracks), SC plays a playlist — track the play event
-    // count to detect when the first track ends and SC auto-advances to the next result.
-    // For direct SC URLs (single track), `finish` fires when the track ends.
-    let playCount = 0
     let advanced = false
-
     const advance = () => {
       if (advanced) return
       advanced = true
@@ -335,10 +330,6 @@ export default function ChillRoom({
         'https://w.soundcloud.com'
       )
       iframe.contentWindow?.postMessage(
-        JSON.stringify({ method: 'addEventListener', value: 'play' }),
-        'https://w.soundcloud.com'
-      )
-      iframe.contentWindow?.postMessage(
         JSON.stringify({ method: 'seekTo', value: 0 }),
         'https://w.soundcloud.com'
       )
@@ -352,14 +343,7 @@ export default function ChillRoom({
       if (e.origin !== 'https://w.soundcloud.com') return
       try {
         const data = JSON.parse(e.data as string)
-        if (data.method === 'play') {
-          playCount++
-          // playCount 1 = initial play; playCount 2+ = SC moved to next track = first song done
-          if (playCount > 1) advance()
-        }
-        if (data.method === 'finish') {
-          advance()
-        }
+        if (data.method === 'finish') advance()
       } catch { /* ignore non-JSON messages */ }
     }
 
