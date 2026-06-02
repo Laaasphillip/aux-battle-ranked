@@ -19,6 +19,9 @@ export default function ColorPicker({ currentColor }: { currentColor: string }) 
     setSaving(true)
     setSaved(false)
 
+    // Persist locally so ChillRoom picks it up immediately
+    localStorage.setItem('auxbattle_character_color', color)
+
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setSaving(false); return }

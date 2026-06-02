@@ -89,26 +89,21 @@ export default function ChillRoom({
   const isSCTrack = !!(currentSong?.track.fullTrackUrl?.includes('soundcloud.com'))
   const isSpotifyTrack = !!(currentSong?.track.spotifyUrl?.includes('open.spotify.com'))
 
-  // Init identity — use profile color if logged in
+  // Init identity — use saved character color if logged in, otherwise hash-based
   useEffect(() => {
     const id = getVisitorId()
     setMyId(id)
 
-    if (serverUsername) {
-      createClient()
-        .from('profiles')
-        .select('character_color')
-        .eq('username', serverUsername)
-        .single()
-        .then(({ data }) => {
-          setMyColor(data?.character_color ?? colorFor(id))
-        })
+    const loggedInAs = localStorage.getItem('auxbattle_username')
+    if (loggedInAs) {
+      const savedColor = localStorage.getItem('auxbattle_character_color')
+      setMyColor(savedColor ?? colorFor(id))
     } else {
       setMyColor(colorFor(id))
       const stored = localStorage.getItem('auxbattle_chill_name')
       if (stored) setMyName(stored)
     }
-  }, [serverUsername])
+  }, [])
 
   // Supabase realtime
   useEffect(() => {
