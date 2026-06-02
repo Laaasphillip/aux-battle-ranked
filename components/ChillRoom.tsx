@@ -88,6 +88,7 @@ export default function ChillRoom({
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const playerCountRef = useRef(0)
+  const presenceReadyRef = useRef(false) // true after first presence sync fires
 
   const currentSong = queue.find(q => q.status === 'playing') ?? null
   const waitingQueue = queue.filter(q => q.status === 'waiting')
@@ -114,6 +115,7 @@ export default function ChillRoom({
 
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState<{ username: string; color: string; x: number; y: number }>()
+      presenceReadyRef.current = true
       playerCountRef.current = Object.keys(state).length
       const next: Record<string, Player> = {}
       for (const [key, list] of Object.entries(state)) {
@@ -150,14 +152,32 @@ export default function ChillRoom({
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myName, color: myColor, x: 50, y: 50 })
-        // Re-sync queue on reconnect so missed events don't leave stale state
-        const { data } = await supabase
-          .from('chill_queue')
-          .select('*')
-          .eq('room_id', room.id)
-          .neq('status', 'finished')
-          .order('created_at', { ascending: true })
-        if (data) setQueue(data as QueueEntry[])
+
+        // Re-sync queue AND messages on every (re)connect so nothing is missed
+        const [queueRes, msgRes] = await Promise.all([
+          supabase
+            .from('chill_queue')
+            .select('*')
+            .eq('room_id', room.id)
+            .neq('status', 'finished')
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('chill_messages')
+            .select('*')
+            .eq('room_id', room.id)
+            .order('created_at', { ascending: true })
+            .limit(100),
+        ])
+        if (queueRes.data) setQueue(queueRes.data as QueueEntry[])
+        if (msgRes.data) setMessages(msgRes.data as Message[])
+      }
+
+      // Auto-recover from channel errors by recreating after a short delay
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setTimeout(() => {
+          supabase.removeChannel(channel)
+          channel.subscribe()
+        }, 3000)
       }
     })
 
@@ -169,8 +189,10 @@ export default function ChillRoom({
     if (!myId) return
 
     const deleteIfEmpty = () => {
-      // playerCountRef.current includes ourselves, so <= 1 means we're the last
-      if (playerCountRef.current <= 1) {
+      // Only delete if presence has synced at least once — prevents deleting the room
+      // before the first sync fires (when playerCountRef is still 0) if the component
+      // unmounts during initial connection (e.g. page error, fast navigation).
+      if (presenceReadyRef.current && playerCountRef.current <= 1) {
         const blob = new Blob(
           [JSON.stringify({ roomId: room.id })],
           { type: 'application/json' }
