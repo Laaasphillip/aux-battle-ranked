@@ -60,6 +60,7 @@ export async function getSoundCloudTrack(url: string) {
       previewUrl,
       spotifyUrl: url,
       durationMs: 0,
+      fullTrackUrl: url,
     }
   } catch {
     return null

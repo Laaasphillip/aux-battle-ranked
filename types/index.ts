@@ -9,6 +9,7 @@ export interface SpotifyTrack {
   previewUrl: string | null
   spotifyUrl: string
   durationMs: number
+  fullTrackUrl?: string | null
 }
 
 export interface Battle {

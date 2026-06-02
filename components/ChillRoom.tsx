@@ -83,14 +83,24 @@ export default function ChillRoom({
   const currentSong = queue.find(q => q.status === 'playing') ?? null
   const waitingQueue = queue.filter(q => q.status === 'waiting')
 
-  const isSCTrack = !!(currentSong?.track.spotifyUrl?.includes('soundcloud.com'))
+  const isSCTrack = !!(currentSong?.track.fullTrackUrl)
 
-  // Init identity
+  // Init identity — use profile color if logged in
   useEffect(() => {
     const id = getVisitorId()
     setMyId(id)
-    setMyColor(colorFor(id))
-    if (!serverUsername) {
+
+    if (serverUsername) {
+      createClient()
+        .from('profiles')
+        .select('character_color')
+        .eq('username', serverUsername)
+        .single()
+        .then(({ data }) => {
+          setMyColor(data?.character_color ?? colorFor(id))
+        })
+    } else {
+      setMyColor(colorFor(id))
       const stored = localStorage.getItem('auxbattle_chill_name')
       if (stored) setMyName(stored)
     }
@@ -217,7 +227,7 @@ export default function ChillRoom({
     }
   }, [currentSong?.id, audioReady, isSCTrack]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // SoundCloud widget control — full track playback for SC links
+  // SoundCloud widget control — full track playback for SC direct links and Spotify-searched-on-SC
   useEffect(() => {
     if (!audioReady || !currentSong || !isSCTrack) return
 
@@ -226,10 +236,29 @@ export default function ChillRoom({
     const iframe = scWidgetRef.current
     if (!iframe) return
 
-    // Give the iframe time to load, then subscribe to events and play
+    // For search-URL embeds (Spotify tracks), SC plays a playlist — track the play event
+    // count to detect when the first track ends and SC auto-advances to the next result.
+    // For direct SC URLs (single track), `finish` fires when the track ends.
+    let playCount = 0
+    let advanced = false
+
+    const advance = () => {
+      if (advanced) return
+      advanced = true
+      fetch('/api/chill/queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, currentId: songId }),
+      })
+    }
+
     const timer = setTimeout(() => {
       iframe.contentWindow?.postMessage(
         JSON.stringify({ method: 'addEventListener', value: 'finish' }),
+        'https://w.soundcloud.com'
+      )
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'addEventListener', value: 'play' }),
         'https://w.soundcloud.com'
       )
       iframe.contentWindow?.postMessage(
@@ -246,12 +275,13 @@ export default function ChillRoom({
       if (e.origin !== 'https://w.soundcloud.com') return
       try {
         const data = JSON.parse(e.data as string)
+        if (data.method === 'play') {
+          playCount++
+          // playCount 1 = initial play; playCount 2+ = SC moved to next track = first song done
+          if (playCount > 1) advance()
+        }
         if (data.method === 'finish') {
-          fetch('/api/chill/queue/next', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId, currentId: songId }),
-          })
+          advance()
         }
       } catch { /* ignore non-JSON messages */ }
     }
@@ -638,11 +668,11 @@ export default function ChillRoom({
       </div>
 
       {/* Hidden SoundCloud widget — full track playback for SC links */}
-      {currentSong && isSCTrack && (
+      {currentSong && isSCTrack && currentSong.track.fullTrackUrl && (
         <iframe
           key={currentSong.id}
           ref={scWidgetRef}
-          src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(currentSong.track.spotifyUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false`}
+          src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(currentSong.track.fullTrackUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false`}
           allow="autoplay"
           aria-hidden
           style={{ position: 'fixed', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}

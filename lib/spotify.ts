@@ -70,6 +70,8 @@ export async function getTrack(trackId: string) {
     previewUrl = await getDeezerPreview(trackName, artist)
   }
 
+  const fullTrackUrl = `https://soundcloud.com/search/sounds?q=${encodeURIComponent(`${trackName} ${artist.split(',')[0].trim()}`)}`
+
   return {
     id: data.id,
     name: trackName,
@@ -79,5 +81,6 @@ export async function getTrack(trackId: string) {
     previewUrl,
     spotifyUrl: data.external_urls.spotify,
     durationMs: data.duration_ms,
+    fullTrackUrl,
   }
 }
