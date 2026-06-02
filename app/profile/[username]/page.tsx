@@ -1,28 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { createBrowserClient } from '@supabase/ssr'
 import { getRank, RANKS } from '@/lib/ranks'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { cookies } from 'next/headers'
-import ColorPicker from '@/components/ColorPicker'
-
-async function getSessionUsername(): Promise<string | null> {
-  try {
-    const cookieStore = await cookies()
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^﻿/, '').trim()
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.replace(/^﻿/, '').trim()
-    const supabase = createBrowserClient(url, key, {
-      cookies: { getAll: () => cookieStore.getAll() },
-    })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-    const db = createAdminClient()
-    const { data } = await db.from('profiles').select('username').eq('id', user.id).single()
-    return data?.username ?? null
-  } catch {
-    return null
-  }
-}
+import ProfileColorSection from '@/components/ProfileColorSection'
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params
@@ -35,9 +15,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
     .single()
 
   if (!profile) notFound()
-
-  const sessionUsername = await getSessionUsername()
-  const isOwner = sessionUsername === profile.username
 
   const rank = getRank(profile.elo)
   const total = profile.wins + profile.losses
@@ -113,8 +90,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         <p className="text-sm font-black text-white">{total}</p>
       </div>
 
-      {/* Color picker — only shown to profile owner */}
-      {isOwner && <ColorPicker currentColor={characterColor} />}
+      {/* Color picker — client-side auth check handles visibility */}
+      <ProfileColorSection profileUsername={profile.username} currentColor={characterColor} />
     </main>
   )
 }

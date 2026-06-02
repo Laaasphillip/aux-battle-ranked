@@ -76,6 +76,9 @@ export default function ChillRoom({
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
+  const spotifyEmbedRef = useRef<HTMLDivElement | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const spotifyControllerRef = useRef<any>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const playerCountRef = useRef(0)
@@ -83,7 +86,8 @@ export default function ChillRoom({
   const currentSong = queue.find(q => q.status === 'playing') ?? null
   const waitingQueue = queue.filter(q => q.status === 'waiting')
 
-  const isSCTrack = !!(currentSong?.track.fullTrackUrl)
+  const isSCTrack = !!(currentSong?.track.fullTrackUrl?.includes('soundcloud.com'))
+  const isSpotifyTrack = !!(currentSong?.track.spotifyUrl?.includes('open.spotify.com'))
 
   // Init identity — use profile color if logged in
   useEffect(() => {
@@ -181,12 +185,85 @@ export default function ChillRoom({
     }
   }, [myId, room.id])
 
-  // Deezer/Spotify preview audio (non-SoundCloud tracks)
+  // Load Spotify IFrame API script once
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    ;(window as Window & { onSpotifyIframeApiReady?: (api: unknown) => void }).onSpotifyIframeApiReady = (api: unknown) => {
+      ;(window as Window & { SpotifyIframeApi?: unknown }).SpotifyIframeApi = api
+    }
+    if (!document.getElementById('spotify-iframe-api')) {
+      const s = document.createElement('script')
+      s.id = 'spotify-iframe-api'
+      s.src = 'https://open.spotify.com/embed/iframe-api/v1'
+      document.head.appendChild(s)
+    }
+  }, [])
+
+  // Spotify IFrame playback — full track for Premium users, 30s for free
+  useEffect(() => {
+    if (!audioReady || !currentSong || !isSpotifyTrack) return
+
+    const songId = currentSong.id
+    const roomId = room.id
+    const trackId = currentSong.track.id
+    let advanced = false
+    let cancelled = false
+
+    const advance = () => {
+      if (advanced) return
+      advanced = true
+      fetch('/api/chill/queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, currentId: songId }),
+      })
+    }
+
+    spotifyControllerRef.current?.pause()
+    spotifyControllerRef.current?.destroy?.()
+    spotifyControllerRef.current = null
+
+    let retries = 0
+    const init = () => {
+      if (cancelled) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const api = (window as Window & { SpotifyIframeApi?: any }).SpotifyIframeApi
+      if (!api || !spotifyEmbedRef.current) {
+        if (retries++ < 30) { setTimeout(init, 500); return }
+        return
+      }
+      spotifyEmbedRef.current.innerHTML = ''
+      api.createController(
+        spotifyEmbedRef.current,
+        { uri: `spotify:track:${trackId}`, width: '100%', height: '80' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (ctrl: any) => {
+          if (cancelled) { ctrl.destroy?.(); return }
+          spotifyControllerRef.current = ctrl
+          ctrl.play()
+          ctrl.addListener('playback_update', ({ data }: { data: { isPaused: boolean; position: number; duration: number } }) => {
+            if (!data.isPaused && data.duration > 0 && data.position >= data.duration - 2) {
+              advance()
+            }
+          })
+        }
+      )
+    }
+    setTimeout(init, 400)
+
+    return () => {
+      cancelled = true
+      advanced = true
+      spotifyControllerRef.current?.pause()
+    }
+  }, [currentSong?.id, audioReady, isSpotifyTrack]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deezer preview audio — only for tracks with no full-track player (SC or Spotify)
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
 
-    if (!audioReady || !currentSong || isSCTrack) return
+    if (!audioReady || !currentSong || isSCTrack || isSpotifyTrack) return
 
     const songId = currentSong.id
     const roomId = room.id
@@ -560,6 +637,11 @@ export default function ChillRoom({
                 <p className="text-xs font-bold text-white truncate">{currentSong.track.name}</p>
                 <p className="text-[10px] text-[#555] truncate mb-0.5">{currentSong.track.artist}</p>
                 <p className="text-[9px] text-[#333]">by {currentSong.queued_by}</p>
+                {/* Spotify embed player — full track for Premium users */}
+                {isSpotifyTrack && (
+                  <div ref={spotifyEmbedRef} className="mt-2.5 rounded-xl overflow-hidden" style={{ minHeight: 80 }} />
+                )}
+
                 <div className="flex gap-2 mt-2.5">
                   {currentSong.queued_by === myName ? (
                     <button

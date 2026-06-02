@@ -31,38 +31,53 @@ export function parseSoundCloudUrl(input: string): string | null {
 }
 
 export async function getSoundCloudTrack(url: string) {
+  let title = ''
+  let artist = ''
+  let albumArt = ''
+
   try {
     const oEmbedRes = await fetch(
       `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`
     )
-    if (!oEmbedRes.ok) return null
-    const data = await oEmbedRes.json()
-
-    let title: string = data.title ?? ''
-    let artist: string = data.author_name ?? ''
-    const albumArt: string = data.thumbnail_url ?? ''
-
-    // SoundCloud titles often come as "Artist - Track Name" — split them for cleaner search
-    if (title.includes(' - ')) {
-      const [parsedArtist, ...rest] = title.split(' - ')
-      artist = parsedArtist.trim()
-      title = rest.join(' - ').trim()
+    if (oEmbedRes.ok) {
+      const data = await oEmbedRes.json()
+      title = data.title ?? ''
+      artist = data.author_name ?? ''
+      albumArt = data.thumbnail_url ?? ''
+      // SoundCloud titles often come as "Artist - Track Name" — split for cleaner search
+      if (title.includes(' - ')) {
+        const [parsedArtist, ...rest] = title.split(' - ')
+        artist = parsedArtist.trim()
+        title = rest.join(' - ').trim()
+      }
     }
+  } catch { /* fall through to URL-derived info */ }
 
-    const previewUrl = await getDeezerPreview(title, artist)
-
-    return {
-      id: url,
-      name: title,
-      artist,
-      album: 'SoundCloud',
-      albumArt,
-      previewUrl,
-      spotifyUrl: url,
-      durationMs: 0,
-      fullTrackUrl: url,
+  // oEmbed failed or returned no title — derive basic info from the URL slug
+  if (!title) {
+    try {
+      const u = new URL(url)
+      const parts = u.pathname.split('/').filter(Boolean)
+      artist = parts[0] ?? 'SoundCloud'
+      title = (parts[1] ?? 'Track')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase())
+    } catch {
+      return null
     }
-  } catch {
-    return null
+  }
+
+  const previewUrl = await getDeezerPreview(title, artist)
+
+  return {
+    id: url,
+    name: title,
+    artist,
+    album: 'SoundCloud',
+    albumArt,
+    previewUrl,
+    spotifyUrl: url,
+    durationMs: 0,
+    fullTrackUrl: url,
   }
 }
