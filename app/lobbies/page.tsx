@@ -39,11 +39,17 @@ export default function LobbiesPage() {
   const router = useRouter()
   const [lobbies, setLobbies] = useState<Lobby[]>([])
   const [loading, setLoading] = useState(true)
+  const [name, setName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
+    const stored = localStorage.getItem('auxbattle_username')
+    if (stored) setName(stored)
+
     const supabase = createClient()
 
-    // Initial fetch — active battles from the last 30 minutes, newest first
     const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     supabase
       .from('battles')
@@ -56,7 +62,6 @@ export default function LobbiesPage() {
         setLoading(false)
       })
 
-    // Realtime — reflect new battles and status changes instantly
     const channel = supabase
       .channel('lobbies-feed')
       .on(
@@ -84,6 +89,34 @@ export default function LobbiesPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  async function createBattle() {
+    if (!name.trim() || creating) return
+    setCreating(true)
+    setCreateError('')
+
+    const { data: { session } } = await createClient().auth.getSession()
+
+    const res = await fetch('/api/battle/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerName: name.trim(),
+        accessToken: session?.access_token ?? null,
+      }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      setCreateError(data.error ?? 'Failed to create battle')
+      setCreating(false)
+      return
+    }
+
+    localStorage.setItem(`auxbattle_role_${data.code}`, 'player1')
+    localStorage.setItem(`auxbattle_name_${data.code}`, name.trim())
+    router.push(`/battle/${data.code}`)
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-8 max-w-2xl mx-auto">
       <div className="w-full flex items-center justify-between mb-8">
@@ -91,20 +124,50 @@ export default function LobbiesPage() {
           ← Home
         </Link>
         <h1 className="font-black text-sm uppercase tracking-widest">Active Lobbies</h1>
-        <div className="w-12" />
+        <button
+          onClick={() => setShowCreate(v => !v)}
+          className="text-xs font-bold uppercase tracking-wider text-[#ef4444] hover:text-white transition-colors"
+        >
+          + New
+        </button>
       </div>
+
+      {/* Create battle panel */}
+      {showCreate && (
+        <div className="w-full bg-[#111] border border-[#222] rounded-2xl p-5 mb-5">
+          <p className="text-xs font-black uppercase tracking-widest mb-3">Start a Battle</p>
+          <input
+            type="text"
+            placeholder="Your name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createBattle()}
+            maxLength={24}
+            autoFocus
+            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#2a2a2a] mb-3 transition-colors"
+          />
+          {createError && <p className="text-[#ef4444] text-xs mb-2">{createError}</p>}
+          <button
+            onClick={createBattle}
+            disabled={!name.trim() || creating}
+            className="w-full bg-white hover:bg-[#eee] text-black font-black py-3 rounded-xl text-sm uppercase tracking-widest disabled:opacity-30 transition-colors"
+          >
+            {creating ? 'Creating...' : 'Create Battle →'}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-[#444] text-sm mt-16">Loading...</p>
       ) : lobbies.length === 0 ? (
         <div className="text-center mt-16">
           <p className="text-[#444] text-sm mb-6">No active lobbies right now.</p>
-          <Link
-            href="/"
+          <button
+            onClick={() => setShowCreate(true)}
             className="text-xs font-bold text-white border border-[#222] hover:border-[#444] px-5 py-2.5 rounded-xl transition-colors uppercase tracking-wider"
           >
             Start one
-          </Link>
+          </button>
         </div>
       ) : (
         <div className="w-full flex flex-col gap-3">
@@ -113,7 +176,6 @@ export default function LobbiesPage() {
               key={lobby.code}
               className="w-full bg-[#111] border border-[#222] rounded-xl px-5 py-4 flex items-center gap-4"
             >
-              {/* Live status dot */}
               <div
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{
@@ -121,8 +183,6 @@ export default function LobbiesPage() {
                   boxShadow: `0 0 6px ${STATUS_COLOR[lobby.status]}`,
                 }}
               />
-
-              {/* Players + status */}
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm truncate">
                   {lobby.player1_name ?? '?'}
@@ -142,8 +202,6 @@ export default function LobbiesPage() {
                   {timeAgo(lobby.created_at)}
                 </p>
               </div>
-
-              {/* Code + action button */}
               <div className="flex items-center gap-3 shrink-0">
                 <span className="font-mono text-xs text-[#444] hidden sm:inline">{lobby.code}</span>
                 <button
