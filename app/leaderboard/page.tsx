@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getRank } from '@/lib/ranks'
 import Link from 'next/link'
 
-export const revalidate = 30
+export const dynamic = 'force-dynamic'
 
 export default async function LeaderboardPage() {
   const db = createAdminClient()
@@ -69,7 +69,7 @@ export default async function LeaderboardPage() {
         </div>
       )}
 
-      <p className="text-[#2a2a2a] text-xs mt-8">Refreshes every 30s</p>
+      <p className="text-[#2a2a2a] text-xs mt-8">Always up to date</p>
     </main>
   )
 }
