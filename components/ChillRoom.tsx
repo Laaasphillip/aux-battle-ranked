@@ -68,17 +68,23 @@ export default function ChillRoom({
   const [resolving, setResolving] = useState(false)
   const [myName, setMyName] = useState(serverUsername ?? '')
   const [nameInput, setNameInput] = useState('')
-  const [myId, setMyId] = useState('')
-  const [myColor, setMyColor] = useState(COLORS[0])
+  // Initialized synchronously from localStorage so they never change after mount —
+  // this prevents the channel effect from re-running and recreating the realtime
+  // connection (which was dropping presence/chat for everyone in the room).
+  const [myId] = useState(() => typeof window !== 'undefined' ? getVisitorId() : '')
+  const [myColor, setMyColor] = useState(() => {
+    if (typeof window === 'undefined') return COLORS[0]
+    const id = getVisitorId()
+    const loggedInAs = localStorage.getItem('auxbattle_username')
+    if (loggedInAs) return localStorage.getItem('auxbattle_character_color') ?? colorFor(id)
+    return colorFor(id)
+  })
   const [addError, setAddError] = useState('')
   const [volume, setVolume] = useState(0.75)
   const [clickTarget, setClickTarget] = useState<{ x: number; y: number; t: number } | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
-  const spotifyEmbedRef = useRef<HTMLDivElement | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const spotifyControllerRef = useRef<any>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const playerCountRef = useRef(0)
@@ -89,21 +95,13 @@ export default function ChillRoom({
   const isSCTrack = !!(currentSong?.track.fullTrackUrl?.includes('soundcloud.com'))
   const isSpotifyTrack = !!(currentSong?.track.spotifyUrl?.includes('open.spotify.com'))
 
-  // Init identity — use saved character color if logged in, otherwise hash-based
+  // Restore guest display name from localStorage
   useEffect(() => {
-    const id = getVisitorId()
-    setMyId(id)
-
-    const loggedInAs = localStorage.getItem('auxbattle_username')
-    if (loggedInAs) {
-      const savedColor = localStorage.getItem('auxbattle_character_color')
-      setMyColor(savedColor ?? colorFor(id))
-    } else {
-      setMyColor(colorFor(id))
+    if (!serverUsername) {
       const stored = localStorage.getItem('auxbattle_chill_name')
       if (stored) setMyName(stored)
     }
-  }, [])
+  }, [serverUsername])
 
   // Supabase realtime
   useEffect(() => {
@@ -152,11 +150,19 @@ export default function ChillRoom({
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ username: myName, color: myColor, x: 50, y: 50 })
+        // Re-sync queue on reconnect so missed events don't leave stale state
+        const { data } = await supabase
+          .from('chill_queue')
+          .select('*')
+          .eq('room_id', room.id)
+          .neq('status', 'finished')
+          .order('created_at', { ascending: true })
+        if (data) setQueue(data as QueueEntry[])
       }
     })
 
     return () => { supabase.removeChannel(channel) }
-  }, [myId, myName, myColor, room.id])
+  }, [myId, myName, room.id]) // myColor intentionally excluded — stable after sync init
 
   // Delete room when we are the last player — fires on tab close and internal navigation
   useEffect(() => {
@@ -180,85 +186,13 @@ export default function ChillRoom({
     }
   }, [myId, room.id])
 
-  // Load Spotify IFrame API script once
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    ;(window as Window & { onSpotifyIframeApiReady?: (api: unknown) => void }).onSpotifyIframeApiReady = (api: unknown) => {
-      ;(window as Window & { SpotifyIframeApi?: unknown }).SpotifyIframeApi = api
-    }
-    if (!document.getElementById('spotify-iframe-api')) {
-      const s = document.createElement('script')
-      s.id = 'spotify-iframe-api'
-      s.src = 'https://open.spotify.com/embed/iframe-api/v1'
-      document.head.appendChild(s)
-    }
-  }, [])
-
-  // Spotify IFrame playback — full track for Premium users, 30s for free
-  useEffect(() => {
-    if (!audioReady || !currentSong || !isSpotifyTrack) return
-
-    const songId = currentSong.id
-    const roomId = room.id
-    const trackId = currentSong.track.id
-    let advanced = false
-    let cancelled = false
-
-    const advance = () => {
-      if (advanced) return
-      advanced = true
-      fetch('/api/chill/queue/next', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, currentId: songId }),
-      })
-    }
-
-    spotifyControllerRef.current?.pause()
-    spotifyControllerRef.current?.destroy?.()
-    spotifyControllerRef.current = null
-
-    let retries = 0
-    const init = () => {
-      if (cancelled) return
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const api = (window as Window & { SpotifyIframeApi?: any }).SpotifyIframeApi
-      if (!api || !spotifyEmbedRef.current) {
-        if (retries++ < 30) { setTimeout(init, 500); return }
-        return
-      }
-      spotifyEmbedRef.current.innerHTML = ''
-      api.createController(
-        spotifyEmbedRef.current,
-        { uri: `spotify:track:${trackId}`, width: '100%', height: '80' },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (ctrl: any) => {
-          if (cancelled) { ctrl.destroy?.(); return }
-          spotifyControllerRef.current = ctrl
-          ctrl.play()
-          ctrl.addListener('playback_update', ({ data }: { data: { isPaused: boolean; position: number; duration: number } }) => {
-            if (!data.isPaused && data.duration > 0 && data.position >= data.duration - 2) {
-              advance()
-            }
-          })
-        }
-      )
-    }
-    setTimeout(init, 400)
-
-    return () => {
-      cancelled = true
-      advanced = true
-      spotifyControllerRef.current?.pause()
-    }
-  }, [currentSong?.id, audioReady, isSpotifyTrack]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Deezer preview audio — only for tracks with no full-track player (SC or Spotify)
+  // Deezer preview audio — handles Spotify tracks (30s auto-advance) and any track
+  // without a direct SC URL. SC tracks use the widget below instead.
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
 
-    if (!audioReady || !currentSong || isSCTrack || isSpotifyTrack) return
+    if (!audioReady || !currentSong || isSCTrack) return
 
     const songId = currentSong.id
     const roomId = room.id
@@ -372,9 +306,6 @@ export default function ChillRoom({
       JSON.stringify({ method: 'setVolume', value: Math.round(volume * 100) }),
       'https://w.soundcloud.com'
     )
-
-    // Spotify IFrame controller (0–1 scale)
-    spotifyControllerRef.current?.setVolume?.(volume)
   }, [volume])
 
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -654,9 +585,16 @@ export default function ChillRoom({
                 <p className="text-xs font-bold text-white truncate">{currentSong.track.name}</p>
                 <p className="text-[10px] text-[#555] truncate mb-0.5">{currentSong.track.artist}</p>
                 <p className="text-[9px] text-[#333]">by {currentSong.queued_by}</p>
-                {/* Spotify embed player — full track for Premium users */}
-                {isSpotifyTrack && (
-                  <div ref={spotifyEmbedRef} className="mt-2.5 rounded-xl overflow-hidden" style={{ minHeight: 80 }} />
+                {/* Spotify embed — click to play full track (Premium) or 30s preview */}
+                {isSpotifyTrack && currentSong && (
+                  <iframe
+                    key={currentSong.id}
+                    src={`https://open.spotify.com/embed/track/${currentSong.track.id}?utm_source=generator&theme=0`}
+                    className="mt-2.5 rounded-xl overflow-hidden w-full"
+                    style={{ height: 80, border: 'none' }}
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                  />
                 )}
 
                 <div className="flex gap-2 mt-2.5">
