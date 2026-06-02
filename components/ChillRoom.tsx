@@ -184,6 +184,32 @@ export default function ChillRoom({
     return () => { supabase.removeChannel(channel) }
   }, [myId, myName, room.id]) // myColor intentionally excluded — stable after sync init
 
+  // Poll queue + messages every 5 s — realtime postgres_changes can silently miss events,
+  // so polling is the reliable fallback that keeps state accurate.
+  useEffect(() => {
+    const supabase = createClient()
+    const sync = async () => {
+      const [q, m] = await Promise.all([
+        supabase
+          .from('chill_queue')
+          .select('*')
+          .eq('room_id', room.id)
+          .neq('status', 'finished')
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('chill_messages')
+          .select('*')
+          .eq('room_id', room.id)
+          .order('created_at', { ascending: true })
+          .limit(100),
+      ])
+      if (q.data) setQueue(q.data as QueueEntry[])
+      if (m.data) setMessages(m.data as Message[])
+    }
+    const id = setInterval(sync, 5000)
+    return () => clearInterval(id)
+  }, [room.id])
+
   // Delete room when we are the last player — fires on tab close and internal navigation
   useEffect(() => {
     if (!myId) return
@@ -356,15 +382,12 @@ export default function ChillRoom({
     setResolving(true)
     setAddError('')
 
-    // Fetch SC oEmbed from the browser — server-to-server requests get 403'd by SC
+    // Fetch SC metadata via our own API (avoids CORS + lets server use browser UA)
     let scMeta: { title?: string; artist?: string; albumArt?: string } | undefined
     const trimmed = urlInput.trim()
     if (trimmed.includes('soundcloud.com')) {
       try {
-        const oe = await fetch(
-          `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(trimmed)}`,
-          { signal: AbortSignal.timeout(5000) }
-        )
+        const oe = await fetch(`/api/sc/metadata?url=${encodeURIComponent(trimmed)}`)
         if (oe.ok) {
           const d = await oe.json()
           let title: string = d.title ?? ''
@@ -374,7 +397,7 @@ export default function ChillRoom({
             artist = a.trim()
             title = rest.join(' - ').trim()
           }
-          scMeta = { title, artist, albumArt: d.thumbnail_url ?? '' }
+          if (title) scMeta = { title, artist, albumArt: d.thumbnail_url ?? '' }
         }
       } catch { /* fall through — server will derive from URL slug */ }
     }

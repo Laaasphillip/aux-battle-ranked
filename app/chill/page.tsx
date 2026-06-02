@@ -28,6 +28,8 @@ export default function ChillPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
+    fetch('/api/chill/cleanup', { method: 'POST' }).catch(() => {})
+
     const supabase = createClient()
     supabase
       .from('chill_rooms')
