@@ -13,6 +13,7 @@ interface Player {
   y: number
   charConfig?: CharConfig
   isDancing?: boolean
+  holdingCup?: boolean
 }
 
 interface QueueEntry {
@@ -98,6 +99,115 @@ function calcPath(
   return path
 }
 
+// ─── Room furniture layout ───────────────────────────────────────────────────
+const ROOM_FURNITURE = [
+  { id: 'sofa-l1',  type: 'sofa',  col: 0, row: 1 },
+  { id: 'sofa-l2',  type: 'sofa',  col: 0, row: 3 },
+  { id: 'sofa-r1',  type: 'sofa',  col: 7, row: 2 },
+  { id: 'table-c',  type: 'table', col: 3, row: 2 },
+  { id: 'cup-c1',   type: 'cup',   col: 3, row: 2 },
+  { id: 'cup-c2',   type: 'cup',   col: 4, row: 2 },
+  { id: 'table-r',  type: 'table', col: 5, row: 3 },
+  { id: 'cup-r1',   type: 'cup',   col: 5, row: 3 },
+  { id: 'bar',      type: 'bar',   col: 6, row: 0 },
+] as const
+
+// ── Sofa ──────────────────────────────────────────────────────────────────────
+function SofaItem() {
+  const bd = '1.5px solid rgba(0,0,0,0.55)'
+  return (
+    <div style={{ position: 'relative', width: 54, height: 46, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.55))' }}>
+      {/* Back rest */}
+      <div style={{ position: 'absolute', bottom: 16, left: 5, right: 5, height: 24, background: '#7a1f2e', border: bd, borderRadius: '4px 4px 0 0' }}>
+        <div style={{ position: 'absolute', inset: 3, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 2 }} />
+        {/* cushion seam */}
+        <div style={{ position: 'absolute', top: '50%', left: 3, right: 3, height: 1, background: 'rgba(0,0,0,0.2)' }} />
+      </div>
+      {/* Left arm */}
+      <div style={{ position: 'absolute', bottom: 6, left: 0, width: 9, height: 32, background: '#6a1925', border: bd }} />
+      {/* Right arm */}
+      <div style={{ position: 'absolute', bottom: 6, right: 0, width: 9, height: 32, background: '#6a1925', border: bd }} />
+      {/* Seat top */}
+      <div style={{ position: 'absolute', bottom: 16, left: 9, right: 9, height: 10, background: '#a02535', border: bd, borderTop: '2px solid rgba(255,255,255,0.12)' }} />
+      {/* Seat front */}
+      <div style={{ position: 'absolute', bottom: 6, left: 9, right: 9, height: 11, background: '#6a1925', border: bd, borderTop: 'none' }} />
+      {/* Legs */}
+      <div style={{ position: 'absolute', bottom: 0, left: 12, width: 5, height: 7, background: '#2a0008', border: bd }} />
+      <div style={{ position: 'absolute', bottom: 0, right: 12, width: 5, height: 7, background: '#2a0008', border: bd }} />
+    </div>
+  )
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function TableItem() {
+  const bd = '1.5px solid rgba(0,0,0,0.45)'
+  return (
+    <div style={{ position: 'relative', width: 46, height: 36, filter: 'drop-shadow(0 3px 7px rgba(0,0,0,0.5))' }}>
+      {/* Top surface */}
+      <div style={{ position: 'absolute', top: 0, left: 3, right: 3, height: 9, background: '#c8924a', border: bd, borderRadius: '3px 3px 0 0' }}>
+        <div style={{ position: 'absolute', inset: 2, background: '#d4a055', borderRadius: 1 }} />
+      </div>
+      {/* Front apron */}
+      <div style={{ position: 'absolute', top: 7, left: 3, right: 3, height: 6, background: '#a07030', border: bd, borderTop: 'none' }} />
+      {/* Legs */}
+      <div style={{ position: 'absolute', top: 12, left: 8,  width: 5, height: 22, background: '#8B6020', border: bd }} />
+      <div style={{ position: 'absolute', top: 12, right: 8, width: 5, height: 22, background: '#8B6020', border: bd }} />
+      {/* Cross brace */}
+      <div style={{ position: 'absolute', top: 22, left: 8, right: 8, height: 3, background: '#7a5215', border: '1px solid rgba(0,0,0,0.2)' }} />
+    </div>
+  )
+}
+
+// ── Bar counter ───────────────────────────────────────────────────────────────
+function BarItem() {
+  const bd = '1.5px solid rgba(0,0,0,0.5)'
+  const bottles = [
+    { x: 6,  h: 15, color: '#27ae60' },
+    { x: 18, h: 13, color: '#8e44ad' },
+    { x: 30, h: 15, color: '#e67e22' },
+    { x: 48, h: 14, color: '#2980b9' },
+    { x: 60, h: 13, color: '#c0392b' },
+  ]
+  return (
+    <div style={{ position: 'relative', width: 86, height: 48, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.55))' }}>
+      {/* Bottles on top */}
+      {bottles.map((b, i) => (
+        <div key={i} style={{ position: 'absolute', bottom: 36, left: b.x, width: 7, height: b.h, background: `linear-gradient(180deg,${b.color}cc,${b.color})`, border: '1px solid rgba(0,0,0,0.4)', borderRadius: '3px 3px 1px 1px' }}>
+          <div style={{ width: 3, height: 3, background: 'rgba(255,255,255,0.3)', margin: '1px auto 0', borderRadius: '50%' }} />
+        </div>
+      ))}
+      {/* Counter top */}
+      <div style={{ position: 'absolute', bottom: 26, left: 0, right: 0, height: 12, background: '#7a4820', border: bd, borderRadius: '3px 3px 0 0' }}>
+        <div style={{ position: 'absolute', inset: 2, background: '#9a6030', borderRadius: 1 }} />
+      </div>
+      {/* Counter front */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 27, background: '#5a3010', border: bd, borderTop: 'none', overflow: 'hidden' }}>
+        {[4,12,20].map(y => (
+          <div key={y} style={{ position: 'absolute', top: y, left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.07)' }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Double cup (on table) ─────────────────────────────────────────────────────
+function DoubleCupOnTable({ onClick, held }: { onClick: () => void; held: boolean }) {
+  return (
+    <div onClick={e => { e.stopPropagation(); onClick() }} style={{ cursor: 'pointer', position: 'relative', width: 14, height: 19, filter: held ? 'drop-shadow(0 0 6px rgba(147,85,200,0.9))' : 'drop-shadow(0 2px 5px rgba(0,0,0,0.5))' }}>
+      {/* Outer cup (lower) */}
+      <div style={{ position: 'absolute', top: '38%', left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg,#f0f0f5,#d8d0ea)', border: '1.5px solid rgba(0,0,0,0.3)', borderRadius: '1px 1px 5px 5px' }} />
+      {/* Inner cup (upper) */}
+      <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '55%', background: 'linear-gradient(180deg,#fafafa,#e8e0f0)', border: '1.5px solid rgba(0,0,0,0.22)', borderRadius: '1px 1px 3px 3px' }} />
+      {/* Lean — purple liquid */}
+      <div style={{ position: 'absolute', top: '6%', left: '15%', right: '15%', height: '28%', background: 'rgba(147,85,200,0.85)', borderRadius: '0 0 2px 2px' }} />
+      {/* Straw */}
+      <div style={{ position: 'absolute', top: -7, left: '60%', width: 2, height: 10, background: '#e74c3c', borderRadius: 1 }} />
+      {/* Glow ring when held */}
+      {held && <div style={{ position: 'absolute', inset: -3, border: '1.5px solid rgba(147,85,200,0.5)', borderRadius: 4, pointerEvents: 'none' }} />}
+    </div>
+  )
+}
+
 // ─── Character customization ─────────────────────────────────────────────────
 interface CharConfig {
   skinTone: number; hairStyle: number; hairColor: string
@@ -123,11 +233,12 @@ const DEFAULT_CHAR: CharConfig = {
 }
 
 // ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
-function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkFrame = 0, isDancing = false }: {
+function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkFrame = 0, isDancing = false, holdingCup = false }: {
   config: CharConfig; name: string; isMe: boolean; bubble?: string; profileColor: string
   reaction?: { emoji: string; t: number }
-  walkFrame?: number    // 0=idle 1=left-step 2=right-step
+  walkFrame?: number
   isDancing?: boolean
+  holdingCup?: boolean
 }) {
   const bd = '1.5px solid rgba(0,0,0,0.6)'
   const st = SKIN_TONES[config.skinTone] ?? SKIN_TONES[0]
@@ -242,7 +353,16 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkF
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ width: 7, height: armH, background: armColor, border: bd, borderLeft: 'none', borderRadius: '0 3px 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
-          <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
+          {holdingCup ? (
+            <div className="cup-held" style={{ position: 'relative', width: 11, height: 16, zIndex: 5 }}>
+              <div style={{ position: 'absolute', top: '36%', left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg,#f0f0f5,#d8d0ea)', border: '1.5px solid rgba(0,0,0,0.3)', borderRadius: '1px 1px 5px 5px' }} />
+              <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '54%', background: '#fafafa', border: '1.5px solid rgba(0,0,0,0.22)', borderRadius: '1px 1px 3px 3px' }} />
+              <div style={{ position: 'absolute', top: '6%', left: '16%', right: '16%', height: '26%', background: 'rgba(147,85,200,0.85)' }} />
+              <div style={{ position: 'absolute', top: -5, left: '60%', width: 1.5, height: 8, background: '#e74c3c', borderRadius: 1 }} />
+            </div>
+          ) : (
+            <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
+          )}
         </div>
       </div>
       {walkFrame > 0 ? (
@@ -458,12 +578,13 @@ export default function ChillRoom({
   const [myWalkFrame, setMyWalkFrame]       = useState(0)
   const [playerWalkFrames, setPlayerWalkFrames] = useState<Record<string,number>>({})
   const [isDancing, setIsDancing]           = useState(false)
+  const [holdingCup, setHoldingCup]         = useState(false)
   const walkTimerRef      = useRef<ReturnType<typeof setTimeout>|null>(null)
   const playerWalkStepRef = useRef<Record<string,number>>({})
   // Mutable snapshot of broadcast fields — updated every render so walk timeouts
   // always use the freshest name/color/config without stale closures.
-  const broadcastRef = useRef({ myName, myColor, charConfig, myId: myId as string })
-  broadcastRef.current = { myName, myColor, charConfig, myId: myId as string }
+  const broadcastRef = useRef({ myName, myColor, charConfig, myId: myId as string, holdingCup: false })
+  broadcastRef.current = { myName, myColor, charConfig, myId: myId as string, holdingCup }
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
@@ -509,9 +630,9 @@ export default function ChillRoom({
       const x = (col / (COLS - 1)) * 100
       const y = (row / (ROWS - 1)) * 100
       setMyPos({ x, y })
-      const { myName: n, myColor: c, charConfig: cfg, myId: id } = broadcastRef.current
-      channelRef.current?.track({ username: n, color: c, x, y, charConfig: cfg, isDancing: false })
-      channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id, username: n, color: c, x, y, charConfig: cfg, isDancing: false } })
+      const { myName: n, myColor: c, charConfig: cfg, myId: id, holdingCup: hc } = broadcastRef.current
+      channelRef.current?.track({ username: n, color: c, x, y, charConfig: cfg, isDancing: false, holdingCup: hc })
+      channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id, username: n, color: c, x, y, charConfig: cfg, isDancing: false, holdingCup: hc } })
       walkTimerRef.current = setTimeout(() => step(i + 1), STEP_MS)
     }
     walkTimerRef.current = setTimeout(() => step(0), 16)
@@ -528,13 +649,13 @@ export default function ChillRoom({
     channelRef.current = channel
 
     channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState<{ username: string; color: string; x: number; y: number; charConfig?: CharConfig; isDancing?: boolean }>()
+      const state = channel.presenceState<{ username: string; color: string; x: number; y: number; charConfig?: CharConfig; isDancing?: boolean; holdingCup?: boolean }>()
       presenceReadyRef.current = true
       playerCountRef.current = Object.keys(state).length
       const next: Record<string, Player> = {}
       for (const [key, list] of Object.entries(state)) {
         const p = list[0]
-        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50, charConfig: p.charConfig, isDancing: p.isDancing }
+        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50, charConfig: p.charConfig, isDancing: p.isDancing, holdingCup: p.holdingCup }
       }
       setPlayers(next)
     })
@@ -599,7 +720,7 @@ export default function ChillRoom({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({ username: myName, color: myColor, x: 50, y: 50, charConfig, isDancing: false })
+        await channel.track({ username: myName, color: myColor, x: 50, y: 50, charConfig, isDancing: false, holdingCup: false })
 
         // Re-sync queue AND messages on every (re)connect so nothing is missed
         const [queueRes, msgRes] = await Promise.all([
@@ -884,6 +1005,17 @@ export default function ChillRoom({
     )
   }, [volume])
 
+  function handleCupClick(col: number, row: number) {
+    const curCol = Math.round((myPos.x / 100) * (COLS - 1))
+    const curRow = Math.round((myPos.y / 100) * (ROWS - 1))
+    const path = calcPath({ col: curCol, row: curRow }, { col, row })
+    if (path.length > 0) setMyWalkPath(path)
+    const next = !holdingCup
+    setHoldingCup(next)
+    channelRef.current?.track({ username: myName, color: myColor, x: myPos.x, y: myPos.y, charConfig, isDancing, holdingCup: next })
+    channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x: myPos.x, y: myPos.y, charConfig, isDancing, holdingCup: next } })
+  }
+
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const svgX = (e.clientX - rect.left) / rect.width  * ISO_VB_W
@@ -1113,6 +1245,27 @@ export default function ChillRoom({
             {/* Isometric room */}
             <IsoRoom />
 
+            {/* Furniture */}
+            {ROOM_FURNITURE.map(item => {
+              const pos = tileScreenPos(item.col, item.row)
+              const zIdx = 2 + item.col + item.row
+              const isCup = item.type === 'cup'
+              return (
+                <div key={item.id}
+                  style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: zIdx, pointerEvents: isCup ? 'auto' : 'none' }}>
+                  {item.type === 'sofa'  && <SofaItem />}
+                  {item.type === 'table' && <TableItem />}
+                  {item.type === 'bar'   && <BarItem />}
+                  {isCup && (
+                    <DoubleCupOnTable
+                      held={holdingCup}
+                      onClick={() => handleCupClick(item.col, item.row)}
+                    />
+                  )}
+                </div>
+              )
+            })}
+
             {/* Click tile ripple */}
             {clickTarget && (() => {
               const col = Math.round((clickTarget.x / 100) * (COLS - 1))
@@ -1139,7 +1292,7 @@ export default function ChillRoom({
                     transition: `left ${STEP_MS * 0.8}ms ease, top ${STEP_MS * 0.8}ms ease`,
                     zIndex: 5 + col + row,
                   }}>
-                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} reaction={playerReactions[player.id]} walkFrame={playerWalkFrames[player.id] ?? 0} isDancing={player.isDancing} />
+                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} reaction={playerReactions[player.id]} walkFrame={playerWalkFrames[player.id] ?? 0} isDancing={player.isDancing} holdingCup={player.holdingCup} />
                 </div>
               )
             })}
@@ -1157,7 +1310,7 @@ export default function ChillRoom({
                     transition: `left ${STEP_MS * 0.75}ms ease, top ${STEP_MS * 0.75}ms ease`,
                     zIndex: 20 + col + row,
                   }}>
-                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} reaction={playerReactions[myId]} walkFrame={myWalkFrame} isDancing={isDancing} />
+                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} reaction={playerReactions[myId]} walkFrame={myWalkFrame} isDancing={isDancing} holdingCup={holdingCup} />
                 </div>
               )
             })()}

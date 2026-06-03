@@ -57,3 +57,14 @@ body {
   animation: tornadoSpin 0.09s linear infinite;
   border-radius: 50%;
 }
+
+@keyframes cupSip {
+  0%, 38%, 100% { transform: rotate(0deg)   translate(0,   0);  }
+  48%            { transform: rotate(-32deg) translate(3px,-4px); }
+  60%            { transform: rotate(-40deg) translate(4px,-6px); }
+  70%            { transform: rotate(-18deg) translate(2px,-2px); }
+}
+.cup-held {
+  animation: cupSip 3.5s ease-in-out infinite;
+  transform-origin: bottom left;
+}
