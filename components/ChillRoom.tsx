@@ -81,35 +81,91 @@ function tileScreenPos(col: number, row: number) {
 }
 
 // ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
-function HabboAvatar({ color, name, isMe }: { color: string; name: string; isMe: boolean }) {
-  const bd = '1.5px solid rgba(0,0,0,0.55)'
+function HabboAvatar({ color, name, isMe, bubble }: {
+  color: string; name: string; isMe: boolean; bubble?: string
+}) {
+  const bd = '1.5px solid rgba(0,0,0,0.6)'
+  const skin = '#fdd0a0'
+  const darkSkin = '#e0b07a'
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', filter: `drop-shadow(0 6px 10px ${color}55)` }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
+
+      {/* Body glow for current user */}
+      {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: color, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
+
+      {/* Chat bubble */}
+      {bubble && (
+        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6, zIndex: 100, pointerEvents: 'none', width: 'max-content', maxWidth: 130 }}>
+          <div style={{ background: '#fff', color: '#0f0f1a', fontSize: 10, fontWeight: 700, fontFamily: 'ui-monospace,monospace', padding: '5px 9px', borderRadius: '10px 10px 10px 3px', boxShadow: '0 2px 12px rgba(0,0,0,0.45)', border: '1.5px solid rgba(0,0,0,0.08)', lineHeight: 1.35, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+            {bubble}
+          </div>
+          {/* Tail */}
+          <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #fff', marginLeft: 7 }} />
+        </div>
+      )}
+
       {/* Hair */}
-      <div style={{ width: 22, height: 7, background: color, border: bd, borderBottom: 'none', borderRadius: '4px 4px 0 0', marginBottom: -1 }} />
+      <div style={{ width: 24, height: 8, background: color, border: bd, borderBottom: 'none', borderRadius: '5px 5px 0 0' }} />
+
       {/* Head */}
-      <div style={{ width: 20, height: 16, background: '#fdd0a0', border: bd, position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 5, left: 2, width: 4, height: 4, background: '#1a1a30' }} />
-        <div style={{ position: 'absolute', top: 5, right: 2, width: 4, height: 4, background: '#1a1a30' }} />
-        <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 8, height: 2, background: 'rgba(180,80,60,0.45)', borderRadius: '0 0 3px 3px' }} />
+      <div style={{ width: 20, height: 18, background: skin, border: bd, position: 'relative' }}>
+        {/* Side hair */}
+        <div style={{ position: 'absolute', top: 0, left: -1, width: 2, height: 9, background: color }} />
+        <div style={{ position: 'absolute', top: 0, right: -1, width: 2, height: 9, background: color }} />
+        {/* Ears */}
+        <div style={{ position: 'absolute', top: 5, left: -3, width: 3, height: 6, background: darkSkin, border: bd, borderRight: 'none', borderRadius: '2px 0 0 2px' }} />
+        <div style={{ position: 'absolute', top: 5, right: -3, width: 3, height: 6, background: darkSkin, border: bd, borderLeft: 'none', borderRadius: '0 2px 2px 0' }} />
+        {/* Left eye */}
+        <div style={{ position: 'absolute', top: 5, left: 2, width: 5, height: 4, background: '#161628' }}>
+          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 2 }} />
+        </div>
+        {/* Right eye */}
+        <div style={{ position: 'absolute', top: 5, right: 2, width: 5, height: 4, background: '#161628' }}>
+          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 1 }} />
+        </div>
+        {/* Mouth */}
+        <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 8, height: 3, background: '#b84040', borderRadius: '1px 1px 4px 4px' }} />
       </div>
-      {/* Torso */}
-      <div style={{ width: 24, height: 18, background: color, border: bd, borderTop: 'none', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ height: 7, background: 'rgba(255,255,255,0.2)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} />
+
+      {/* Neck */}
+      <div style={{ width: 8, height: 3, background: skin, marginTop: -1 }} />
+
+      {/* Torso row: left arm | body | right arm */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: -1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: 7, height: 14, background: color, border: bd, borderRight: 'none', borderRadius: '3px 0 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
+          <div style={{ width: 7, height: 5, background: skin, border: bd, borderRight: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
+        </div>
+        <div style={{ width: 18, height: 19, background: color, border: bd, borderTop: '1px solid rgba(255,255,255,0.2)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} />
+          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.35)', margin: '3px auto 0' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: 7, height: 14, background: color, border: bd, borderLeft: 'none', borderRadius: '0 3px 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
+          <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
+        </div>
       </div>
+
+      {/* Belt */}
+      <div style={{ width: 18, height: 4, background: '#0a0a1e', border: bd, borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 5, height: 2, background: '#666', borderLeft: '1px solid #999', borderRight: '1px solid #999' }} />
+      </div>
+
       {/* Legs */}
       <div style={{ display: 'flex', gap: 2 }}>
-        <div style={{ width: 9, height: 12, background: '#18182e', border: bd, borderTop: 'none' }} />
-        <div style={{ width: 9, height: 12, background: '#18182e', border: bd, borderTop: 'none' }} />
+        <div style={{ width: 8, height: 13, background: '#18182e', border: bd, borderTop: 'none' }} />
+        <div style={{ width: 8, height: 13, background: '#18182e', border: bd, borderTop: 'none' }} />
       </div>
+
       {/* Shoes */}
       <div style={{ display: 'flex', gap: 2, marginTop: 1 }}>
-        <div style={{ width: 11, height: 5, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '0 3px 0 0' }} />
-        <div style={{ width: 11, height: 5, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '3px 0 0 0' }} />
+        <div style={{ width: 11, height: 5, background: '#06060e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 4px 0 0' }} />
+        <div style={{ width: 11, height: 5, background: '#06060e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px 0 0 0' }} />
       </div>
+
       {/* Name badge */}
       <div style={{
-        marginTop: 5, background: isMe ? color : 'rgba(6,6,6,0.9)',
+        marginTop: 5, background: isMe ? color : 'rgba(8,8,8,0.88)',
         border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
         padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap',
         boxShadow: isMe ? `0 0 12px ${color}80` : 'none',
@@ -219,6 +275,20 @@ export default function ChillRoom({
   const [addError, setAddError] = useState('')
   const [volume, setVolume] = useState(0.75)
   const [clickTarget, setClickTarget] = useState<{ x: number; y: number; t: number } | null>(null)
+  const [chatBubbles, setChatBubbles] = useState<Record<string, { text: string; t: number }>>({})
+
+  function showBubble(username: string, text: string) {
+    const t = Date.now()
+    setChatBubbles(prev => ({ ...prev, [username]: { text, t } }))
+    setTimeout(() => {
+      setChatBubbles(prev => {
+        if (prev[username]?.t !== t) return prev
+        const next = { ...prev }
+        delete next[username]
+        return next
+      })
+    }, 5000)
+  }
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
@@ -284,7 +354,9 @@ export default function ChillRoom({
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'chill_messages', filter: `room_id=eq.${room.id}` },
       (payload) => {
-        setMessages(prev => [...prev.slice(-99), payload.new as Message])
+        const msg = payload.new as Message
+        setMessages(prev => [...prev.slice(-99), msg])
+        showBubble(msg.username, msg.content)
       }
     )
 
@@ -577,6 +649,7 @@ export default function ChillRoom({
     if (!chatInput.trim() || !myName) return
     const content = chatInput.trim()
     setChatInput('')
+    showBubble(myName, content)
     await fetch('/api/chill/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -771,7 +844,7 @@ export default function ChillRoom({
                     transition: 'left 0.35s ease, top 0.35s ease',
                     zIndex: 5 + col + row,
                   }}>
-                  <HabboAvatar color={player.color} name={player.username} isMe={false} />
+                  <HabboAvatar color={player.color} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} />
                 </div>
               )
             })}
@@ -789,7 +862,7 @@ export default function ChillRoom({
                     transition: 'left 0.18s ease, top 0.18s ease',
                     zIndex: 20 + col + row,
                   }}>
-                  <HabboAvatar color={myColor} name={myName} isMe />
+                  <HabboAvatar color={myColor} name={myName} isMe bubble={chatBubbles[myName]?.text} />
                 </div>
               )
             })()}
