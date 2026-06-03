@@ -260,9 +260,9 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkF
           {pantStyle !== 3 && shoesEl}
         </>
       )}
-      <div style={{ marginTop: 5, background: isMe ? profileColor : 'rgba(8,8,8,0.88)', border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', boxShadow: isMe ? `0 0 12px ${profileColor}80` : 'none' }}>
-        <span style={{ fontSize: 9, color: '#fff', fontWeight: 900, fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px' }}>{name}</span>
-      </div>
+      <p style={{ marginTop: 4, fontSize: 9, fontWeight: 900, color: isMe ? profileColor : '#ccc', fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7)' }}>
+        {name}
+      </p>
     </div>
   )
 }
