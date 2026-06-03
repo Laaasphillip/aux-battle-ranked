@@ -353,16 +353,17 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkF
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ width: 7, height: armH, background: armColor, border: bd, borderLeft: 'none', borderRadius: '0 3px 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
-          {holdingCup ? (
-            <div className="cup-held" style={{ position: 'relative', width: 11, height: 16, zIndex: 5 }}>
-              <div style={{ position: 'absolute', top: '36%', left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg,#f0f0f5,#d8d0ea)', border: '1.5px solid rgba(0,0,0,0.3)', borderRadius: '1px 1px 5px 5px' }} />
-              <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '54%', background: '#fafafa', border: '1.5px solid rgba(0,0,0,0.22)', borderRadius: '1px 1px 3px 3px' }} />
-              <div style={{ position: 'absolute', top: '6%', left: '16%', right: '16%', height: '26%', background: 'rgba(147,85,200,0.85)' }} />
-              <div style={{ position: 'absolute', top: -5, left: '60%', width: 1.5, height: 8, background: '#e74c3c', borderRadius: 1 }} />
-            </div>
-          ) : (
-            <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
-          )}
+          {/* Hand placeholder always keeps flex-row height stable */}
+          <div style={{ width: 7, height: 5, background: holdingCup ? 'transparent' : skin, border: holdingCup ? 'none' : bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px', position: 'relative' }}>
+            {holdingCup && (
+              <div className="cup-held" style={{ position: 'absolute', top: -1, left: 0, width: 11, height: 16, zIndex: 5 }}>
+                <div style={{ position: 'absolute', top: '36%', left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg,#f0f0f5,#d8d0ea)', border: '1.5px solid rgba(0,0,0,0.3)', borderRadius: '1px 1px 5px 5px' }} />
+                <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '54%', background: '#fafafa', border: '1.5px solid rgba(0,0,0,0.22)', borderRadius: '1px 1px 3px 3px' }} />
+                <div style={{ position: 'absolute', top: '6%', left: '16%', right: '16%', height: '26%', background: 'rgba(147,85,200,0.85)' }} />
+                <div style={{ position: 'absolute', top: -5, left: '60%', width: 1.5, height: 8, background: '#e74c3c', borderRadius: 1 }} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {walkFrame > 0 ? (
@@ -1250,9 +1251,11 @@ export default function ChillRoom({
               const pos = tileScreenPos(item.col, item.row)
               const zIdx = 2 + item.col + item.row
               const isCup = item.type === 'cup'
+              // Cups sit on top of the table surface (~28px above tile baseline)
+              const yShift = isCup ? -28 : 0
               return (
                 <div key={item.id}
-                  style={{ position: 'absolute', left: pos.left, top: pos.top, transform: 'translate(-50%, -100%)', zIndex: zIdx, pointerEvents: isCup ? 'auto' : 'none' }}>
+                  style={{ position: 'absolute', left: pos.left, top: pos.top, transform: `translate(-50%, -100%) translateY(${yShift}px)`, zIndex: isCup ? zIdx + 1 : zIdx, pointerEvents: isCup ? 'auto' : 'none' }}>
                   {item.type === 'sofa'  && <SofaItem />}
                   {item.type === 'table' && <TableItem />}
                   {item.type === 'bar'   && <BarItem />}
