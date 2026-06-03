@@ -82,7 +82,7 @@ function tileScreenPos(col: number, row: number) {
   }
 }
 
-const STEP_MS = 380   // ms per tile while walking
+const STEP_MS = 430   // ms per tile while walking
 
 function calcPath(
   from: { col: number; row: number },
@@ -205,7 +205,7 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkF
     : <div style={{ display: 'flex', gap: 2, marginTop: 1 }}><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 4px 0 0' }} /><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px 0 0 0' }} /></div>
 
   return (
-    <div className={isDancing ? 'avatar-dance' : ''} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
+    <div className={isDancing ? 'avatar-dance' : ''} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))', transform: !isDancing && walkFrame === 1 ? 'translateY(-5px)' : undefined }}>
       {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: profileColor, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
       {reaction && (
         <div key={reaction.t} className="reaction-float" style={{
@@ -245,9 +245,21 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkF
           <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
         </div>
       </div>
-      {pantStyle !== 3 && <div style={{ width: 18, height: 4, background: '#0a0a1e', border: bd, borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 5, height: 2, background: '#666', borderLeft: '1px solid #999', borderRight: '1px solid #999' }} /></div>}
-      {pantsEl}
-      {pantStyle !== 3 && shoesEl}
+      {walkFrame > 0 ? (
+        /* Looney-Tunes tornado legs — spinning oval replaces belt+pants+shoes */
+        <div className="legs-tornado" style={{
+          width: 24,
+          height: legH + 14,
+          background: `linear-gradient(180deg, ${pantColor} 20%, ${shoeColor} 100%)`,
+          marginTop: 1,
+        }} />
+      ) : (
+        <>
+          {pantStyle !== 3 && <div style={{ width: 18, height: 4, background: '#0a0a1e', border: bd, borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 5, height: 2, background: '#666', borderLeft: '1px solid #999', borderRight: '1px solid #999' }} /></div>}
+          {pantsEl}
+          {pantStyle !== 3 && shoesEl}
+        </>
+      )}
       <div style={{ marginTop: 5, background: isMe ? profileColor : 'rgba(8,8,8,0.88)', border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', boxShadow: isMe ? `0 0 12px ${profileColor}80` : 'none' }}>
         <span style={{ fontSize: 9, color: '#fff', fontWeight: 900, fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px' }}>{name}</span>
       </div>
@@ -876,7 +888,9 @@ export default function ChillRoom({
     const rect = e.currentTarget.getBoundingClientRect()
     const svgX = (e.clientX - rect.left) / rect.width  * ISO_VB_W
     const svgY = (e.clientY - rect.top)  / rect.height * ISO_VB_H
-    const target = screenToTile(svgX, svgY, OX, OY)
+    // isoPos(col,row) is the tile's TOP corner, but the visual centre is TH/2 lower.
+    // Shift Y up by TH/2 so a click on the visible tile face maps to the correct tile.
+    const target = screenToTile(svgX, svgY - TH / 2, OX, OY)
 
     const curCol = Math.round((myPos.x / 100) * (COLS - 1))
     const curRow = Math.round((myPos.y / 100) * (ROWS - 1))

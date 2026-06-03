@@ -45,3 +45,15 @@ body {
   animation: habboDance 0.6s ease-in-out infinite;
   transform-origin: center bottom;
 }
+
+@keyframes tornadoSpin {
+  0%   { transform: scaleX(1.0) rotate(0deg);   }
+  25%  { transform: scaleX(0.1) rotate(90deg);  }
+  50%  { transform: scaleX(1.0) rotate(180deg); }
+  75%  { transform: scaleX(0.1) rotate(270deg); }
+  100% { transform: scaleX(1.0) rotate(360deg); }
+}
+.legs-tornado {
+  animation: tornadoSpin 0.09s linear infinite;
+  border-radius: 50%;
+}
