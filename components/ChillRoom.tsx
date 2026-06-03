@@ -12,6 +12,7 @@ interface Player {
   x: number
   y: number
   charConfig?: CharConfig
+  isDancing?: boolean
 }
 
 interface QueueEntry {
@@ -81,6 +82,22 @@ function tileScreenPos(col: number, row: number) {
   }
 }
 
+const STEP_MS = 380   // ms per tile while walking
+
+function calcPath(
+  from: { col: number; row: number },
+  to: { col: number; row: number }
+): { col: number; row: number }[] {
+  const path: { col: number; row: number }[] = []
+  let { col, row } = from
+  while (col !== to.col || row !== to.row) {
+    col += to.col > col ? 1 : to.col < col ? -1 : 0
+    row += to.row > row ? 1 : to.row < row ? -1 : 0
+    path.push({ col, row })
+  }
+  return path
+}
+
 // ─── Character customization ─────────────────────────────────────────────────
 interface CharConfig {
   skinTone: number; hairStyle: number; hairColor: string
@@ -106,9 +123,11 @@ const DEFAULT_CHAR: CharConfig = {
 }
 
 // ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
-function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction }: {
+function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction, walkFrame = 0, isDancing = false }: {
   config: CharConfig; name: string; isMe: boolean; bubble?: string; profileColor: string
   reaction?: { emoji: string; t: number }
+  walkFrame?: number    // 0=idle 1=left-step 2=right-step
+  isDancing?: boolean
 }) {
   const bd = '1.5px solid rgba(0,0,0,0.6)'
   const st = SKIN_TONES[config.skinTone] ?? SKIN_TONES[0]
@@ -116,6 +135,9 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction }: {
   const skin = st.base, darkSkin = st.dark
   const legH = [8, 13, 18][height] ?? 13
   const armH = [11, 14, 17][height] ?? 14
+  // Leg heights alternate to create walking bob
+  const leftLegH  = walkFrame === 1 ? legH - 3 : walkFrame === 2 ? legH + 2 : legH
+  const rightLegH = walkFrame === 2 ? legH - 3 : walkFrame === 1 ? legH + 2 : legH
 
   // Hair top piece
   let hairEl: React.ReactNode = null
@@ -170,10 +192,10 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction }: {
   const pantsEl = pantStyle === 1
     ? <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: 7, background: pantColor, border: bd, borderTop: 'none' }} /><div style={{ width: 8, height: 7, background: pantColor, border: bd, borderTop: 'none' }} /></div>
     : pantStyle === 2
-    ? <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div></div>
+    ? <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: leftLegH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div><div style={{ width: 8, height: rightLegH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div></div>
     : pantStyle === 3
     ? <div style={{ width: 22, height: 11, background: pantColor, border: bd, borderTop: 'none', borderRadius: '0 0 6px 6px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{[0,1,2].map(i => <div key={i} style={{ flex: 1, background: i%2===0 ? pantColor : `${pantColor}99`, borderBottom: '0.5px solid rgba(0,0,0,0.12)' }} />)}</div>
-    : <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none' }} /><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none' }} /></div>
+    : <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: leftLegH, background: pantColor, border: bd, borderTop: 'none' }} /><div style={{ width: 8, height: rightLegH, background: pantColor, border: bd, borderTop: 'none' }} /></div>
 
   // Shoes
   const shoesEl = shoeStyle === 1
@@ -183,7 +205,7 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction }: {
     : <div style={{ display: 'flex', gap: 2, marginTop: 1 }}><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 4px 0 0' }} /><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px 0 0 0' }} /></div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
+    <div className={isDancing ? 'avatar-dance' : ''} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
       {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: profileColor, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
       {reaction && (
         <div key={reaction.t} className="reaction-float" style={{
@@ -420,6 +442,17 @@ export default function ChillRoom({
 
   const currentSongIdRef = useRef<string | null>(null)
 
+  const [myWalkPath, setMyWalkPath]         = useState<{col:number;row:number}[]>([])
+  const [myWalkFrame, setMyWalkFrame]       = useState(0)
+  const [playerWalkFrames, setPlayerWalkFrames] = useState<Record<string,number>>({})
+  const [isDancing, setIsDancing]           = useState(false)
+  const walkTimerRef      = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const playerWalkStepRef = useRef<Record<string,number>>({})
+  // Mutable snapshot of broadcast fields — updated every render so walk timeouts
+  // always use the freshest name/color/config without stale closures.
+  const broadcastRef = useRef({ myName, myColor, charConfig, myId: myId as string })
+  broadcastRef.current = { myName, myColor, charConfig, myId: myId as string }
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
   const ytWidgetRef = useRef<HTMLIFrameElement | null>(null)
@@ -452,6 +485,27 @@ export default function ChillRoom({
     setSongVotes({ up: 0, down: 0 })
   }, [currentSong?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Walk tile-by-tile whenever myWalkPath is set
+  useEffect(() => {
+    if (myWalkPath.length === 0) return
+    if (walkTimerRef.current) clearTimeout(walkTimerRef.current)
+
+    const step = (i: number) => {
+      if (i >= myWalkPath.length) { setMyWalkFrame(0); walkTimerRef.current = null; return }
+      const { col, row } = myWalkPath[i]
+      setMyWalkFrame(i % 2 === 0 ? 1 : 2)
+      const x = (col / (COLS - 1)) * 100
+      const y = (row / (ROWS - 1)) * 100
+      setMyPos({ x, y })
+      const { myName: n, myColor: c, charConfig: cfg, myId: id } = broadcastRef.current
+      channelRef.current?.track({ username: n, color: c, x, y, charConfig: cfg, isDancing: false })
+      channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id, username: n, color: c, x, y, charConfig: cfg, isDancing: false } })
+      walkTimerRef.current = setTimeout(() => step(i + 1), STEP_MS)
+    }
+    walkTimerRef.current = setTimeout(() => step(0), 16)
+    return () => { if (walkTimerRef.current) clearTimeout(walkTimerRef.current) }
+  }, [myWalkPath]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Supabase realtime
   useEffect(() => {
     if (!myId || !myName) return
@@ -462,19 +516,32 @@ export default function ChillRoom({
     channelRef.current = channel
 
     channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState<{ username: string; color: string; x: number; y: number; charConfig?: CharConfig }>()
+      const state = channel.presenceState<{ username: string; color: string; x: number; y: number; charConfig?: CharConfig; isDancing?: boolean }>()
       presenceReadyRef.current = true
       playerCountRef.current = Object.keys(state).length
       const next: Record<string, Player> = {}
       for (const [key, list] of Object.entries(state)) {
         const p = list[0]
-        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50, charConfig: p.charConfig }
+        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50, charConfig: p.charConfig, isDancing: p.isDancing }
       }
       setPlayers(next)
     })
 
     channel.on('broadcast', { event: 'move' }, ({ payload }) => {
-      setPlayers(prev => ({ ...prev, [payload.id]: { ...prev[payload.id], ...payload } }))
+      const { id } = payload as { id: string }
+      setPlayers(prev => ({ ...prev, [id]: { ...prev[id], ...payload } }))
+      // Advance walk frame for this player on every received step
+      const prevStep = playerWalkStepRef.current[id] ?? 0
+      const newStep  = prevStep + 1
+      playerWalkStepRef.current[id] = newStep
+      const frame = newStep % 2 === 0 ? 2 : 1
+      setPlayerWalkFrames(prev => ({ ...prev, [id]: frame }))
+      // Return to idle if no new move arrives within STEP_MS * 2
+      const captured = newStep
+      setTimeout(() => {
+        if (playerWalkStepRef.current[id] === captured)
+          setPlayerWalkFrames(prev => ({ ...prev, [id]: 0 }))
+      }, STEP_MS * 2)
     })
 
     channel.on('broadcast', { event: 'react' }, ({ payload }) => {
@@ -520,7 +587,7 @@ export default function ChillRoom({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({ username: myName, color: myColor, x: 50, y: 50, charConfig })
+        await channel.track({ username: myName, color: myColor, x: 50, y: 50, charConfig, isDancing: false })
 
         // Re-sync queue AND messages on every (re)connect so nothing is missed
         const [queueRes, msgRes] = await Promise.all([
@@ -807,16 +874,27 @@ export default function ChillRoom({
 
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
-    // Map click to SVG viewBox space (preserveAspectRatio="none" → direct linear mapping)
     const svgX = (e.clientX - rect.left) / rect.width  * ISO_VB_W
     const svgY = (e.clientY - rect.top)  / rect.height * ISO_VB_H
-    const { col, row } = screenToTile(svgX, svgY, OX, OY)
-    const x = (col / (COLS - 1)) * 100
-    const y = (row / (ROWS - 1)) * 100
-    setMyPos({ x, y })
-    setClickTarget({ x, y, t: Date.now() })
-    channelRef.current?.track({ username: myName, color: myColor, x, y, charConfig })
-    channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x, y, charConfig } })
+    const target = screenToTile(svgX, svgY, OX, OY)
+
+    const curCol = Math.round((myPos.x / 100) * (COLS - 1))
+    const curRow = Math.round((myPos.y / 100) * (ROWS - 1))
+
+    if (target.col === curCol && target.row === curRow) {
+      // Same tile → toggle dance
+      const next = !isDancing
+      setIsDancing(next)
+      channelRef.current?.track({ username: myName, color: myColor, x: myPos.x, y: myPos.y, charConfig, isDancing: next })
+      channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x: myPos.x, y: myPos.y, charConfig, isDancing: next } })
+      return
+    }
+
+    setIsDancing(false)
+    const destX = (target.col / (COLS - 1)) * 100
+    const destY = (target.row / (ROWS - 1)) * 100
+    setClickTarget({ x: destX, y: destY, t: Date.now() })
+    setMyWalkPath(calcPath({ col: curCol, row: curRow }, target))
   }
 
   async function sendMessage() {
@@ -1044,10 +1122,10 @@ export default function ChillRoom({
                   style={{
                     left: pos.left, top: pos.top,
                     transform: 'translate(-50%, -100%)',
-                    transition: 'left 0.35s ease, top 0.35s ease',
+                    transition: `left ${STEP_MS * 0.8}ms ease, top ${STEP_MS * 0.8}ms ease`,
                     zIndex: 5 + col + row,
                   }}>
-                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} reaction={playerReactions[player.id]} />
+                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} reaction={playerReactions[player.id]} walkFrame={playerWalkFrames[player.id] ?? 0} isDancing={player.isDancing} />
                 </div>
               )
             })}
@@ -1062,16 +1140,16 @@ export default function ChillRoom({
                   style={{
                     left: pos.left, top: pos.top,
                     transform: 'translate(-50%, -100%)',
-                    transition: 'left 0.18s ease, top 0.18s ease',
+                    transition: `left ${STEP_MS * 0.75}ms ease, top ${STEP_MS * 0.75}ms ease`,
                     zIndex: 20 + col + row,
                   }}>
-                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} reaction={playerReactions[myId]} />
+                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} reaction={playerReactions[myId]} walkFrame={myWalkFrame} isDancing={isDancing} />
                 </div>
               )
             })()}
           </div>
           <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#22254a] pointer-events-none select-none">
-            Click to move
+            Click to move · click your tile to {isDancing ? 'stop dancing' : 'dance'}
           </p>
         </div>
 
