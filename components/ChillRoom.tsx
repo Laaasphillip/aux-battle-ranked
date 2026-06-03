@@ -603,8 +603,7 @@ export default function ChillRoom({
     }
   }, [myId, room.id])
 
-  // Deezer preview audio — handles Spotify tracks (30s auto-advance) and any track
-  // without a direct SC URL. SC tracks use the widget below instead.
+  // Deezer preview audio — fallback for tracks without a direct SC/YT URL
   useEffect(() => {
     audioRef.current?.pause()
     audioRef.current = null
@@ -613,20 +612,7 @@ export default function ChillRoom({
 
     const songId = currentSong.id
     const roomId = room.id
-
-    if (!currentSong.track.previewUrl) {
-      const t = setTimeout(() => {
-        fetch('/api/chill/queue/next', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId, currentId: songId }),
-        })
-      }, 500)
-      return () => clearTimeout(t)
-    }
-
-    const audio = new Audio(currentSong.track.previewUrl)
-    audio.volume = volume
+    const startedAt = currentSong.started_at ? new Date(currentSong.started_at).getTime() : Date.now()
 
     const advance = () => {
       fetch('/api/chill/queue/next', {
@@ -636,8 +622,21 @@ export default function ChillRoom({
       })
     }
 
+    if (!currentSong.track.previewUrl) {
+      const t = setTimeout(advance, 500)
+      return () => clearTimeout(t)
+    }
+
+    // If we've already burned through the 30s preview, skip immediately
+    const elapsedAtLoad = Math.max(0, (Date.now() - startedAt) / 1000)
+    if (elapsedAtLoad >= 29) { advance(); return }
+
+    const audio = new Audio(currentSong.track.previewUrl)
+    audio.volume = volume
+
     audio.addEventListener('canplaythrough', () => {
-      audio.currentTime = 0
+      // Seek to current position so everyone hears the same part of the preview
+      audio.currentTime = Math.min(Math.max(0, (Date.now() - startedAt) / 1000), 29)
       audio.play().catch(() => {})
     }, { once: true })
     audio.onended = advance
@@ -656,6 +655,7 @@ export default function ChillRoom({
 
     const songId = currentSong.id
     const roomId = room.id
+    const startedAt = currentSong.started_at ? new Date(currentSong.started_at).getTime() : Date.now()
     const iframe = scWidgetRef.current
     if (!iframe) return
 
@@ -671,6 +671,7 @@ export default function ChillRoom({
     }
 
     const timer = setTimeout(() => {
+      const elapsedMs = Math.max(0, Date.now() - startedAt)
       iframe.contentWindow?.postMessage(
         JSON.stringify({ method: 'addEventListener', value: 'finish' }),
         'https://w.soundcloud.com'
@@ -680,7 +681,7 @@ export default function ChillRoom({
         'https://w.soundcloud.com'
       )
       iframe.contentWindow?.postMessage(
-        JSON.stringify({ method: 'seekTo', value: 0 }),
+        JSON.stringify({ method: 'seekTo', value: elapsedMs }),
         'https://w.soundcloud.com'
       )
       iframe.contentWindow?.postMessage(
@@ -716,11 +717,15 @@ export default function ChillRoom({
     const songId = currentSong.id
     const roomId = room.id
     const durationMs = currentSong.track.durationMs ?? 0
+    const startedAt = currentSong.started_at ? new Date(currentSong.started_at).getTime() : Date.now()
     let advanced = false
+    let played = false
+    let advanceTimer: ReturnType<typeof setTimeout> | null = null
 
     const advance = () => {
       if (advanced) return
       advanced = true
+      if (advanceTimer) clearTimeout(advanceTimer)
       fetch('/api/chill/queue/next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -728,41 +733,52 @@ export default function ChillRoom({
       })
     }
 
-    // Primary: duration-based timer using Spotify's exact track length
-    const timer = durationMs > 10000
-      ? setTimeout(advance, durationMs - 3000)
-      : setTimeout(advance, 30000)
+    // Called once: after onReady fires (or fallback timer). Sends play + seekTo.
+    const sendPlay = () => {
+      if (played) return
+      played = true
+      const elapsedMs = Math.max(0, Date.now() - startedAt)
+      // Already past the end — just advance
+      if (durationMs > 0 && elapsedMs >= durationMs - 2000) { advance(); return }
+      const win = ytWidgetRef.current?.contentWindow
+      if (!win) return
+      // Use '*' origin — required when iframe may still be loading (origin isn't youtube.com yet)
+      win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(volume * 100)] }), '*')
+      win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*')
+      // Sync to position if joined mid-song (skip seekTo for the first few seconds — unreliable)
+      const elapsedSec = elapsedMs / 1000
+      if (elapsedSec > 4) {
+        setTimeout(() => {
+          ytWidgetRef.current?.contentWindow?.postMessage(
+            JSON.stringify({ event: 'command', func: 'seekTo', args: [Math.floor(elapsedSec), true] }), '*'
+          )
+        }, 1500)
+      }
+      // Duration-based advance timer from current elapsed position
+      const remaining = durationMs > 10000 ? Math.max(5000, durationMs - elapsedMs - 2000) : 30000
+      advanceTimer = setTimeout(advance, remaining)
+    }
 
-    // Secondary: YouTube IFrame API end-of-video event (state 0 = ended)
     const onMessage = (e: MessageEvent) => {
       if (!e.origin.includes('youtube.com')) return
       try {
         const data = JSON.parse(e.data as string)
+        if (data.event === 'onReady') sendPlay()
         if (data.event === 'onStateChange' && data.info === 0) advance()
       } catch { /* non-JSON */ }
     }
     window.addEventListener('message', onMessage)
 
-    // Play + set volume after iframe loads
-    const playTimer = setTimeout(() => {
-      ytWidgetRef.current?.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(volume * 100)] }),
-        'https://www.youtube.com'
-      )
-      ytWidgetRef.current?.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-        'https://www.youtube.com'
-      )
-    }, 2000)
+    // Fallback: if onReady never fires within 4s (slow load / no API event), try anyway
+    const fallback = setTimeout(() => sendPlay(), 4000)
 
     return () => {
-      clearTimeout(timer)
-      clearTimeout(playTimer)
+      clearTimeout(fallback)
+      if (advanceTimer) clearTimeout(advanceTimer)
       window.removeEventListener('message', onMessage)
       advanced = true
       ytWidgetRef.current?.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'stopVideo', args: [] }),
-        'https://www.youtube.com'
+        JSON.stringify({ event: 'command', func: 'stopVideo', args: [] }), '*'
       )
     }
   }, [currentSong?.id, audioReady, isYTTrack]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1248,7 +1264,7 @@ export default function ChillRoom({
           src={currentSong.track.fullTrackUrl}
           allow="autoplay; encrypted-media"
           aria-hidden
-          style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+          style={{ position: 'fixed', bottom: 0, right: 0, width: 2, height: 2, opacity: 0.01, pointerEvents: 'none' }}
         />
       )}
     </div>
