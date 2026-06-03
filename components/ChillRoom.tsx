@@ -11,6 +11,7 @@ interface Player {
   color: string
   x: number
   y: number
+  charConfig?: CharConfig
 }
 
 interface QueueEntry {
@@ -80,99 +81,200 @@ function tileScreenPos(col: number, row: number) {
   }
 }
 
+// ─── Character customization ─────────────────────────────────────────────────
+interface CharConfig {
+  skinTone: number; hairStyle: number; hairColor: string
+  faceStyle: number
+  shirtStyle: number; shirtColor: string
+  pantStyle: number; pantColor: string
+  shoeStyle: number; shoeColor: string
+  height: number
+}
+const SKIN_TONES: { base: string; dark: string }[] = [
+  { base: '#fdd0a0', dark: '#e0b07a' }, { base: '#f5c083', dark: '#d49060' },
+  { base: '#e8a56a', dark: '#c07845' }, { base: '#c27a3a', dark: '#9a5a20' },
+  { base: '#9b5a20', dark: '#7a3f10' }, { base: '#6b3a10', dark: '#4a2508' },
+]
+const HAIR_COLORS  = ['#111111','#6b3a10','#c27a3a','#e8c060','#ef4444','#ec4899','#8b5cf6','#ffffff']
+const SHIRT_COLORS = ['#ef4444','#3b82f6','#22c55e','#f97316','#8b5cf6','#ec4899','#06b6d4','#fbbf24','#ffffff','#1a1a2e']
+const PANT_COLORS  = ['#18182e','#1e3a5f','#2d1b69','#1a2e1a','#3a1a1a','#555555']
+const SHOE_COLORS  = ['#06060e','#4a3728','#ffffff','#ef4444','#3b82f6','#222222']
+const DEFAULT_CHAR: CharConfig = {
+  skinTone: 0, hairStyle: 0, hairColor: '#111111',
+  faceStyle: 0, shirtStyle: 0, shirtColor: '#3b82f6',
+  pantStyle: 0, pantColor: '#18182e', shoeStyle: 0, shoeColor: '#06060e', height: 1,
+}
+
 // ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
-function HabboAvatar({ color, name, isMe, bubble }: {
-  color: string; name: string; isMe: boolean; bubble?: string
+function HabboAvatar({ config, name, isMe, bubble, profileColor }: {
+  config: CharConfig; name: string; isMe: boolean; bubble?: string; profileColor: string
 }) {
   const bd = '1.5px solid rgba(0,0,0,0.6)'
-  const skin = '#fdd0a0'
-  const darkSkin = '#e0b07a'
+  const st = SKIN_TONES[config.skinTone] ?? SKIN_TONES[0]
+  const { hairStyle, hairColor, faceStyle, shirtStyle, shirtColor, pantStyle, pantColor, shoeStyle, shoeColor, height } = config
+  const skin = st.base, darkSkin = st.dark
+  const legH = [8, 13, 18][height] ?? 13
+  const armH = [11, 14, 17][height] ?? 14
+
+  // Hair top piece
+  let hairEl: React.ReactNode = null
+  if (hairStyle === 1)
+    hairEl = <div style={{ width: 24, height: 14, background: hairColor, border: bd, borderBottom: 'none', clipPath: 'polygon(0% 100%, 0% 55%, 10% 0%, 22% 62%, 36% 8%, 50% 65%, 64% 8%, 78% 62%, 90% 0%, 100% 55%, 100% 100%)' }} />
+  else if (hairStyle === 2)
+    hairEl = <div style={{ width: 24, height: 8, background: hairColor, border: bd, borderBottom: 'none', borderRadius: '5px 5px 0 0' }} />
+  else if (hairStyle === 3)
+    hairEl = <div style={{ width: 24, height: 15, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}><div style={{ width: 10, height: 15, background: hairColor, border: bd, borderBottom: 'none', borderRadius: '4px 4px 0 0' }} /></div>
+  else if (hairStyle !== 4)
+    hairEl = <div style={{ width: 24, height: 8, background: hairColor, border: bd, borderBottom: 'none', borderRadius: '5px 5px 0 0' }} />
+
+  // Side hair (abs children of head div)
+  let sideHair: React.ReactNode = null
+  if (hairStyle === 0)
+    sideHair = <><div style={{ position: 'absolute', top: 0, left: -1, width: 2, height: 9, background: hairColor }} /><div style={{ position: 'absolute', top: 0, right: -1, width: 2, height: 9, background: hairColor }} /></>
+  else if (hairStyle === 2)
+    sideHair = <><div style={{ position: 'absolute', top: 0, left: -4, width: 5, height: 22, background: hairColor, border: bd, borderRight: 'none', borderRadius: '0 0 0 3px' }} /><div style={{ position: 'absolute', top: 0, right: -4, width: 5, height: 22, background: hairColor, border: bd, borderLeft: 'none', borderRadius: '0 0 3px 0' }} /></>
+
+  // Face parts
+  const face = faceStyle === 1 ? {
+    l: <div style={{ position: 'absolute', top: 5, left: 2, width: 5, height: 4, background: '#161628' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 2 }} /></div>,
+    r: <div style={{ position: 'absolute', top: 5, right: 2, width: 5, height: 4, background: '#161628' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 1 }} /></div>,
+    m: <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 10, height: 3, background: '#b84040', borderRadius: '0 0 8px 8px' }} />,
+  } : faceStyle === 2 ? {
+    l: <div style={{ position: 'absolute', top: 6, left: 2, width: 5, height: 2, background: '#161628' }} />,
+    r: <div style={{ position: 'absolute', top: 6, right: 2, width: 5, height: 2, background: '#161628' }} />,
+    m: <div style={{ position: 'absolute', bottom: 3, right: 3, width: 7, height: 2, background: '#b84040', borderRadius: '1px 1px 3px 3px' }} />,
+  } : faceStyle === 3 ? {
+    l: <div style={{ position: 'absolute', top: 4, left: 3, width: 4, height: 5, background: '#161628', borderRadius: '50%' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', margin: '0 auto' }} /></div>,
+    r: <div style={{ position: 'absolute', top: 4, right: 3, width: 4, height: 5, background: '#161628', borderRadius: '50%' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', margin: '0 auto' }} /></div>,
+    m: <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 6, height: 5, background: '#b84040', borderRadius: '50%' }} />,
+  } : {
+    l: <div style={{ position: 'absolute', top: 5, left: 2, width: 5, height: 4, background: '#161628' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 2 }} /></div>,
+    r: <div style={{ position: 'absolute', top: 5, right: 2, width: 5, height: 4, background: '#161628' }}><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 1 }} /></div>,
+    m: <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 8, height: 3, background: '#b84040', borderRadius: '1px 1px 4px 4px' }} />,
+  }
+
+  // Shirt body + arm color
+  const armColor = shirtStyle === 3 ? skin : shirtColor
+  let shirtContent: React.ReactNode
+  if (shirtStyle === 1)
+    shirtContent = <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{[0,1,2,3].map(i => <div key={i} style={{ flex: 1, background: i%2===0 ? shirtColor : 'rgba(255,255,255,0.28)', borderBottom: '0.5px solid rgba(0,0,0,0.1)' }} />)}</div>
+  else if (shirtStyle === 2)
+    shirtContent = <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '9px solid rgba(0,0,0,0.35)' }} />
+  else if (shirtStyle === 4)
+    shirtContent = <><div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} /><div style={{ position: 'absolute', top: 0, left: 1, width: 5, height: 11, background: 'rgba(0,0,0,0.22)', clipPath: 'polygon(0 0, 100% 0, 60% 100%, 0 100%)' }} /><div style={{ position: 'absolute', top: 0, right: 1, width: 5, height: 11, background: 'rgba(0,0,0,0.22)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 40% 100%)' }} /></>
+  else
+    shirtContent = <><div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} /><div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.35)', margin: '3px auto 0' }} /></>
+
+  // Pants
+  const pantsEl = pantStyle === 1
+    ? <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: 7, background: pantColor, border: bd, borderTop: 'none' }} /><div style={{ width: 8, height: 7, background: pantColor, border: bd, borderTop: 'none' }} /></div>
+    : pantStyle === 2
+    ? <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none', overflow: 'hidden' }}><div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.15)', marginTop: 3 }} /></div></div>
+    : pantStyle === 3
+    ? <div style={{ width: 22, height: 11, background: pantColor, border: bd, borderTop: 'none', borderRadius: '0 0 6px 6px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{[0,1,2].map(i => <div key={i} style={{ flex: 1, background: i%2===0 ? pantColor : `${pantColor}99`, borderBottom: '0.5px solid rgba(0,0,0,0.12)' }} />)}</div>
+    : <div style={{ display: 'flex', gap: 2 }}><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none' }} /><div style={{ width: 8, height: legH, background: pantColor, border: bd, borderTop: 'none' }} /></div>
+
+  // Shoes
+  const shoesEl = shoeStyle === 1
+    ? <div style={{ display: 'flex', gap: 2, marginTop: 1 }}><div style={{ width: 10, height: 9, background: shoeColor, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0 6px 0 0' }} /><div style={{ width: 10, height: 9, background: shoeColor, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px 0 0 0' }} /></div>
+    : shoeStyle === 2
+    ? <div style={{ display: 'flex', gap: 2, marginTop: 1 }}><div style={{ width: 12, height: 4, background: shoeColor, border: '1px solid rgba(0,0,0,0.3)', borderRadius: '0 3px 0 0', display: 'flex', justifyContent: 'center' }}><div style={{ width: 2, height: 4, background: skin }} /></div><div style={{ width: 12, height: 4, background: shoeColor, border: '1px solid rgba(0,0,0,0.3)', borderRadius: '3px 0 0 0', display: 'flex', justifyContent: 'center' }}><div style={{ width: 2, height: 4, background: skin }} /></div></div>
+    : <div style={{ display: 'flex', gap: 2, marginTop: 1 }}><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 4px 0 0' }} /><div style={{ width: 11, height: 5, background: shoeColor, border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px 0 0 0' }} /></div>
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
-
-      {/* Body glow for current user */}
-      {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: color, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
-
-      {/* Chat bubble */}
+      {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: profileColor, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
       {bubble && (
         <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6, zIndex: 100, pointerEvents: 'none', width: 'max-content', maxWidth: 130 }}>
-          <div style={{ background: '#fff', color: '#0f0f1a', fontSize: 10, fontWeight: 700, fontFamily: 'ui-monospace,monospace', padding: '5px 9px', borderRadius: '10px 10px 10px 3px', boxShadow: '0 2px 12px rgba(0,0,0,0.45)', border: '1.5px solid rgba(0,0,0,0.08)', lineHeight: 1.35, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-            {bubble}
-          </div>
-          {/* Tail */}
+          <div style={{ background: '#fff', color: '#0f0f1a', fontSize: 10, fontWeight: 700, fontFamily: 'ui-monospace,monospace', padding: '5px 9px', borderRadius: '10px 10px 10px 3px', boxShadow: '0 2px 12px rgba(0,0,0,0.45)', border: '1.5px solid rgba(0,0,0,0.08)', lineHeight: 1.35, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{bubble}</div>
           <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #fff', marginLeft: 7 }} />
         </div>
       )}
-
-      {/* Hair */}
-      <div style={{ width: 24, height: 8, background: color, border: bd, borderBottom: 'none', borderRadius: '5px 5px 0 0' }} />
-
-      {/* Head */}
+      {hairEl}
       <div style={{ width: 20, height: 18, background: skin, border: bd, position: 'relative' }}>
-        {/* Side hair */}
-        <div style={{ position: 'absolute', top: 0, left: -1, width: 2, height: 9, background: color }} />
-        <div style={{ position: 'absolute', top: 0, right: -1, width: 2, height: 9, background: color }} />
-        {/* Ears */}
-        <div style={{ position: 'absolute', top: 5, left: -3, width: 3, height: 6, background: darkSkin, border: bd, borderRight: 'none', borderRadius: '2px 0 0 2px' }} />
-        <div style={{ position: 'absolute', top: 5, right: -3, width: 3, height: 6, background: darkSkin, border: bd, borderLeft: 'none', borderRadius: '0 2px 2px 0' }} />
-        {/* Left eye */}
-        <div style={{ position: 'absolute', top: 5, left: 2, width: 5, height: 4, background: '#161628' }}>
-          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 2 }} />
-        </div>
-        {/* Right eye */}
-        <div style={{ position: 'absolute', top: 5, right: 2, width: 5, height: 4, background: '#161628' }}>
-          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.6)', marginLeft: 1 }} />
-        </div>
-        {/* Mouth */}
-        <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 8, height: 3, background: '#b84040', borderRadius: '1px 1px 4px 4px' }} />
+        {sideHair}
+        {hairStyle !== 2 && <><div style={{ position: 'absolute', top: 5, left: -3, width: 3, height: 6, background: darkSkin, border: bd, borderRight: 'none', borderRadius: '2px 0 0 2px' }} /><div style={{ position: 'absolute', top: 5, right: -3, width: 3, height: 6, background: darkSkin, border: bd, borderLeft: 'none', borderRadius: '0 2px 2px 0' }} /></>}
+        {face.l}{face.r}{face.m}
       </div>
-
-      {/* Neck */}
       <div style={{ width: 8, height: 3, background: skin, marginTop: -1 }} />
-
-      {/* Torso row: left arm | body | right arm */}
       <div style={{ display: 'flex', alignItems: 'flex-start', marginTop: -1 }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ width: 7, height: 14, background: color, border: bd, borderRight: 'none', borderRadius: '3px 0 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
+          <div style={{ width: 7, height: armH, background: armColor, border: bd, borderRight: 'none', borderRadius: '3px 0 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
           <div style={{ width: 7, height: 5, background: skin, border: bd, borderRight: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
         </div>
-        <div style={{ width: 18, height: 19, background: color, border: bd, borderTop: '1px solid rgba(255,255,255,0.2)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ height: 6, background: 'rgba(255,255,255,0.18)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} />
-          <div style={{ width: 2, height: 2, background: 'rgba(255,255,255,0.35)', margin: '3px auto 0' }} />
+        <div style={{ width: 18, height: armH + 5, background: shirtColor, border: bd, borderTop: '1px solid rgba(255,255,255,0.2)', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {shirtContent}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ width: 7, height: 14, background: color, border: bd, borderLeft: 'none', borderRadius: '0 3px 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
+          <div style={{ width: 7, height: armH, background: armColor, border: bd, borderLeft: 'none', borderRadius: '0 3px 0 0', borderTop: '1px solid rgba(255,255,255,0.2)' }} />
           <div style={{ width: 7, height: 5, background: skin, border: bd, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 3px 3px' }} />
         </div>
       </div>
-
-      {/* Belt */}
-      <div style={{ width: 18, height: 4, background: '#0a0a1e', border: bd, borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 5, height: 2, background: '#666', borderLeft: '1px solid #999', borderRight: '1px solid #999' }} />
+      {pantStyle !== 3 && <div style={{ width: 18, height: 4, background: '#0a0a1e', border: bd, borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 5, height: 2, background: '#666', borderLeft: '1px solid #999', borderRight: '1px solid #999' }} /></div>}
+      {pantsEl}
+      {pantStyle !== 3 && shoesEl}
+      <div style={{ marginTop: 5, background: isMe ? profileColor : 'rgba(8,8,8,0.88)', border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', boxShadow: isMe ? `0 0 12px ${profileColor}80` : 'none' }}>
+        <span style={{ fontSize: 9, color: '#fff', fontWeight: 900, fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px' }}>{name}</span>
       </div>
+    </div>
+  )
+}
 
-      {/* Legs */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        <div style={{ width: 8, height: 13, background: '#18182e', border: bd, borderTop: 'none' }} />
-        <div style={{ width: 8, height: 13, background: '#18182e', border: bd, borderTop: 'none' }} />
-      </div>
+// ─── Customizer UI helpers ────────────────────────────────────────────────────
+function CLabel({ text }: { text: string }) {
+  return <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#3a3d72', marginBottom: 6 }}>{text}</p>
+}
+function Btns({ labels, selected, onSelect }: { labels: string[]; selected: number; onSelect: (i: number) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+      {labels.map((l, i) => (
+        <button key={i} onClick={() => onSelect(i)} style={{ fontSize: 10, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: selected === i ? '#2a2d60' : 'rgba(10,10,30,0.8)', border: selected === i ? '1px solid #5a5daa' : '1px solid #1e2248', color: selected === i ? '#fff' : '#555' }}>{l}</button>
+      ))}
+    </div>
+  )
+}
+function Swatches({ opts, sel, onPick }: { opts: string[]; sel: string; onPick: (c: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+      {opts.map(c => <button key={c} onClick={() => onPick(c)} style={{ width: 22, height: 22, background: c, border: sel === c ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.12)', borderRadius: 5, cursor: 'pointer' }} />)}
+    </div>
+  )
+}
+function CharCustomizer({ config, profileColor, onUpdate, onClose }: {
+  config: CharConfig; profileColor: string; onUpdate: (c: CharConfig) => void; onClose: () => void
+}) {
+  const [local, setLocal] = useState<CharConfig>(config)
+  const set = (p: Partial<CharConfig>) => { const n = { ...local, ...p }; setLocal(n); onUpdate(n) }
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#0d0e1f', border: '1px solid #2a2d5a', borderRadius: 16, padding: 20, display: 'flex', gap: 20, maxWidth: 660, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
-      {/* Shoes */}
-      <div style={{ display: 'flex', gap: 2, marginTop: 1 }}>
-        <div style={{ width: 11, height: 5, background: '#06060e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 4px 0 0' }} />
-        <div style={{ width: 11, height: 5, background: '#06060e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px 0 0 0' }} />
-      </div>
+        {/* Live preview */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <CLabel text="Preview" />
+          <div style={{ background: 'linear-gradient(180deg,#0f0f22 0%,#1a1840 100%)', borderRadius: 12, padding: '28px 24px 16px', minHeight: 195, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', border: '1px solid #1e2248' }}>
+            <HabboAvatar config={local} name="You" isMe profileColor={profileColor} />
+          </div>
+        </div>
 
-      {/* Name badge */}
-      <div style={{
-        marginTop: 5, background: isMe ? color : 'rgba(8,8,8,0.88)',
-        border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
-        padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap',
-        boxShadow: isMe ? `0 0 12px ${color}80` : 'none',
-      }}>
-        <span style={{ fontSize: 9, color: '#fff', fontWeight: 900, fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px' }}>
-          {name}
-        </span>
+        {/* Controls */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: 13, fontWeight: 900, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Character</p>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          <div><CLabel text="Height" /><Btns labels={['Short','Normal','Tall']} selected={local.height} onSelect={v => set({ height: v })} /></div>
+          <div><CLabel text="Skin Tone" /><Swatches opts={SKIN_TONES.map(s => s.base)} sel={SKIN_TONES[local.skinTone]?.base ?? ''} onPick={c => set({ skinTone: SKIN_TONES.findIndex(s => s.base === c) })} /></div>
+          <div><CLabel text="Hair Style" /><Btns labels={['Classic','Spiky','Long','Mohawk','Bald']} selected={local.hairStyle} onSelect={v => set({ hairStyle: v })} /></div>
+          {local.hairStyle < 4 && <div><CLabel text="Hair Color" /><Swatches opts={HAIR_COLORS} sel={local.hairColor} onPick={c => set({ hairColor: c })} /></div>}
+          <div><CLabel text="Face" /><Btns labels={['Normal','Happy','Cool','Surprised']} selected={local.faceStyle} onSelect={v => set({ faceStyle: v })} /></div>
+          <div><CLabel text="Top Style" /><Btns labels={['Plain','Striped','Hoodie','Tank','Jacket']} selected={local.shirtStyle} onSelect={v => set({ shirtStyle: v })} /></div>
+          <div><CLabel text="Top Color" /><Swatches opts={SHIRT_COLORS} sel={local.shirtColor} onPick={c => set({ shirtColor: c })} /></div>
+          <div><CLabel text="Bottom Style" /><Btns labels={['Pants','Shorts','Jeans','Skirt']} selected={local.pantStyle} onSelect={v => set({ pantStyle: v })} /></div>
+          <div><CLabel text="Bottom Color" /><Swatches opts={PANT_COLORS} sel={local.pantColor} onPick={c => set({ pantColor: c })} /></div>
+          <div><CLabel text="Shoes" /><Btns labels={['Sneakers','Boots','Sandals']} selected={local.shoeStyle} onSelect={v => set({ shoeStyle: v })} /></div>
+          <div><CLabel text="Shoe Color" /><Swatches opts={SHOE_COLORS} sel={local.shoeColor} onPick={c => set({ shoeColor: c })} /></div>
+        </div>
       </div>
     </div>
   )
@@ -290,6 +392,17 @@ export default function ChillRoom({
     }, 5000)
   }
 
+  const [charConfig, setCharConfig] = useState<CharConfig>(() => {
+    if (typeof window === 'undefined') return DEFAULT_CHAR
+    try {
+      const stored = localStorage.getItem('auxbattle_char_config')
+      if (stored) return { ...DEFAULT_CHAR, ...JSON.parse(stored) as CharConfig }
+    } catch { /* ignore */ }
+    const c = localStorage.getItem('auxbattle_character_color') ?? '#3b82f6'
+    return { ...DEFAULT_CHAR, hairColor: c, shirtColor: c }
+  })
+  const [showCustomizer, setShowCustomizer] = useState(false)
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
   const ytWidgetRef = useRef<HTMLIFrameElement | null>(null)
@@ -313,6 +426,10 @@ export default function ChillRoom({
     }
   }, [serverUsername])
 
+  useEffect(() => {
+    localStorage.setItem('auxbattle_char_config', JSON.stringify(charConfig))
+  }, [charConfig])
+
   // Supabase realtime
   useEffect(() => {
     if (!myId || !myName) return
@@ -323,13 +440,13 @@ export default function ChillRoom({
     channelRef.current = channel
 
     channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState<{ username: string; color: string; x: number; y: number }>()
+      const state = channel.presenceState<{ username: string; color: string; x: number; y: number; charConfig?: CharConfig }>()
       presenceReadyRef.current = true
       playerCountRef.current = Object.keys(state).length
       const next: Record<string, Player> = {}
       for (const [key, list] of Object.entries(state)) {
         const p = list[0]
-        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50 }
+        next[key] = { id: key, username: p.username, color: p.color, x: p.x ?? 50, y: p.y ?? 50, charConfig: p.charConfig }
       }
       setPlayers(next)
     })
@@ -362,7 +479,7 @@ export default function ChillRoom({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({ username: myName, color: myColor, x: 50, y: 50 })
+        await channel.track({ username: myName, color: myColor, x: 50, y: 50, charConfig })
 
         // Re-sync queue AND messages on every (re)connect so nothing is missed
         const [queueRes, msgRes] = await Promise.all([
@@ -641,8 +758,8 @@ export default function ChillRoom({
     const y = (row / (ROWS - 1)) * 100
     setMyPos({ x, y })
     setClickTarget({ x, y, t: Date.now() })
-    channelRef.current?.track({ username: myName, color: myColor, x, y })
-    channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x, y } })
+    channelRef.current?.track({ username: myName, color: myColor, x, y, charConfig })
+    channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { id: myId, username: myName, color: myColor, x, y, charConfig } })
   }
 
   async function sendMessage() {
@@ -793,6 +910,12 @@ export default function ChillRoom({
               />
             </div>
           )}
+          <button
+            onClick={() => setShowCustomizer(true)}
+            className="text-[9px] font-bold uppercase tracking-widest border border-[#1e2248] hover:border-[#3a3d72] text-[#444] hover:text-[#aaa] px-2.5 py-1 rounded-lg transition-colors"
+          >
+            Avatar
+          </button>
           <div className="w-2 h-2 rounded-full" style={{ background: myColor }} />
           <span className="text-xs text-[#555]">{myName}</span>
         </div>
@@ -844,7 +967,7 @@ export default function ChillRoom({
                     transition: 'left 0.35s ease, top 0.35s ease',
                     zIndex: 5 + col + row,
                   }}>
-                  <HabboAvatar color={player.color} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} />
+                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} />
                 </div>
               )
             })}
@@ -862,7 +985,7 @@ export default function ChillRoom({
                     transition: 'left 0.18s ease, top 0.18s ease',
                     zIndex: 20 + col + row,
                   }}>
-                  <HabboAvatar color={myColor} name={myName} isMe bubble={chatBubbles[myName]?.text} />
+                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} />
                 </div>
               )
             })()}
@@ -1001,6 +1124,19 @@ export default function ChillRoom({
           </div>
         </div>
       </div>
+
+      {/* Character customizer modal */}
+      {showCustomizer && (
+        <CharCustomizer
+          config={charConfig}
+          profileColor={myColor}
+          onUpdate={updated => {
+            setCharConfig(updated)
+            channelRef.current?.track({ username: myName, color: myColor, x: myPos.x, y: myPos.y, charConfig: updated })
+          }}
+          onClose={() => setShowCustomizer(false)}
+        />
+      )}
 
       {/* Hidden SoundCloud widget — full track playback for SC links */}
       {/* Hidden SoundCloud widget */}
