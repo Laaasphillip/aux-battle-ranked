@@ -106,8 +106,9 @@ const DEFAULT_CHAR: CharConfig = {
 }
 
 // ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
-function HabboAvatar({ config, name, isMe, bubble, profileColor }: {
+function HabboAvatar({ config, name, isMe, bubble, profileColor, reaction }: {
   config: CharConfig; name: string; isMe: boolean; bubble?: string; profileColor: string
+  reaction?: { emoji: string; t: number }
 }) {
   const bd = '1.5px solid rgba(0,0,0,0.6)'
   const st = SKIN_TONES[config.skinTone] ?? SKIN_TONES[0]
@@ -184,6 +185,18 @@ function HabboAvatar({ config, name, isMe, bubble, profileColor }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.5))' }}>
       {isMe && <div style={{ position: 'absolute', top: '35%', left: '50%', transform: 'translate(-50%,-50%)', width: 38, height: 38, background: profileColor, filter: 'blur(14px)', opacity: 0.3, borderRadius: '50%', pointerEvents: 'none' }} />}
+      {reaction && (
+        <div key={reaction.t} className="reaction-float" style={{
+          position: 'absolute', bottom: 'calc(100% + 2px)', left: '50%',
+          zIndex: 120, lineHeight: 1, whiteSpace: 'nowrap',
+          fontSize: reaction.emoji === 'BOO!' ? 13 : 26,
+          fontWeight: reaction.emoji === 'BOO!' ? 900 : undefined,
+          color: reaction.emoji === 'BOO!' ? '#ef4444' : undefined,
+          fontFamily: reaction.emoji === 'BOO!' ? 'ui-monospace,monospace' : undefined,
+        }}>
+          {reaction.emoji}
+        </div>
+      )}
       {bubble && (
         <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6, zIndex: 100, pointerEvents: 'none', width: 'max-content', maxWidth: 130 }}>
           <div style={{ background: '#fff', color: '#0f0f1a', fontSize: 10, fontWeight: 700, fontFamily: 'ui-monospace,monospace', padding: '5px 9px', borderRadius: '10px 10px 10px 3px', boxShadow: '0 2px 12px rgba(0,0,0,0.45)', border: '1.5px solid rgba(0,0,0,0.08)', lineHeight: 1.35, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{bubble}</div>
@@ -402,6 +415,10 @@ export default function ChillRoom({
     return { ...DEFAULT_CHAR, hairColor: c, shirtColor: c }
   })
   const [showCustomizer, setShowCustomizer] = useState(false)
+  const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; t: number }>>({})
+  const [songVotes, setSongVotes] = useState({ up: 0, down: 0 })
+
+  const currentSongIdRef = useRef<string | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scWidgetRef = useRef<HTMLIFrameElement | null>(null)
@@ -430,6 +447,11 @@ export default function ChillRoom({
     localStorage.setItem('auxbattle_char_config', JSON.stringify(charConfig))
   }, [charConfig])
 
+  useEffect(() => {
+    currentSongIdRef.current = currentSong?.id ?? null
+    setSongVotes({ up: 0, down: 0 })
+  }, [currentSong?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Supabase realtime
   useEffect(() => {
     if (!myId || !myName) return
@@ -453,6 +475,25 @@ export default function ChillRoom({
 
     channel.on('broadcast', { event: 'move' }, ({ payload }) => {
       setPlayers(prev => ({ ...prev, [payload.id]: { ...prev[payload.id], ...payload } }))
+    })
+
+    channel.on('broadcast', { event: 'react' }, ({ payload }) => {
+      const { id, emoji, songId } = payload as { id: string; emoji: string; songId: string | null }
+      if (id === myId) return
+      const t = Date.now()
+      setPlayerReactions(prev => ({ ...prev, [id]: { emoji, t } }))
+      setTimeout(() => {
+        setPlayerReactions(prev => {
+          if (prev[id]?.t !== t) return prev
+          const next = { ...prev }; delete next[id]; return next
+        })
+      }, 3000)
+      if ((emoji === '👍' || emoji === '👎') && songId === currentSongIdRef.current) {
+        setSongVotes(prev => ({
+          up:   emoji === '👍' ? prev.up + 1   : prev.up,
+          down: emoji === '👎' ? prev.down + 1 : prev.down,
+        }))
+      }
     })
 
     channel.on(
@@ -774,6 +815,29 @@ export default function ChillRoom({
     })
   }
 
+  function sendReaction(emoji: string) {
+    if (!myId) return
+    const t = Date.now()
+    setPlayerReactions(prev => ({ ...prev, [myId]: { emoji, t } }))
+    setTimeout(() => {
+      setPlayerReactions(prev => {
+        if (prev[myId]?.t !== t) return prev
+        const next = { ...prev }; delete next[myId]; return next
+      })
+    }, 3000)
+    if (emoji === '👍' || emoji === '👎') {
+      setSongVotes(prev => ({
+        up:   emoji === '👍' ? prev.up + 1   : prev.up,
+        down: emoji === '👎' ? prev.down + 1 : prev.down,
+      }))
+    }
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'react',
+      payload: { id: myId, emoji, songId: currentSongIdRef.current },
+    })
+  }
+
   async function addToQueue() {
     if (!urlInput.trim() || !myName || resolving) return
     setResolving(true)
@@ -967,7 +1031,7 @@ export default function ChillRoom({
                     transition: 'left 0.35s ease, top 0.35s ease',
                     zIndex: 5 + col + row,
                   }}>
-                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} />
+                  <HabboAvatar config={player.charConfig ?? DEFAULT_CHAR} name={player.username} isMe={false} bubble={chatBubbles[player.username]?.text} profileColor={player.color} reaction={playerReactions[player.id]} />
                 </div>
               )
             })}
@@ -985,7 +1049,7 @@ export default function ChillRoom({
                     transition: 'left 0.18s ease, top 0.18s ease',
                     zIndex: 20 + col + row,
                   }}>
-                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} />
+                  <HabboAvatar config={charConfig} name={myName} isMe bubble={chatBubbles[myName]?.text} profileColor={myColor} reaction={playerReactions[myId]} />
                 </div>
               )
             })()}
@@ -1036,6 +1100,31 @@ export default function ChillRoom({
                       Vote skip ({currentSong.skip_votes}/3)
                     </button>
                   )}
+                </div>
+
+                {/* Reaction bar */}
+                <div className="mt-2.5">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#2a2a2a] mb-1.5">React</p>
+                  <div className="flex flex-wrap gap-1">
+                    <button onClick={() => sendReaction('👍')}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[#1a1a1a] hover:border-[#22c55e]/50 hover:bg-[#22c55e]/10 text-sm transition-all active:scale-90">
+                      👍{songVotes.up > 0 && <span className="text-[9px] text-[#22c55e] font-bold">{songVotes.up}</span>}
+                    </button>
+                    <button onClick={() => sendReaction('👎')}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[#1a1a1a] hover:border-[#ef4444]/50 hover:bg-[#ef4444]/10 text-sm transition-all active:scale-90">
+                      👎{songVotes.down > 0 && <span className="text-[9px] text-[#ef4444] font-bold">{songVotes.down}</span>}
+                    </button>
+                    {['🔥','❤️','😂','💀','😤'].map(e => (
+                      <button key={e} onClick={() => sendReaction(e)}
+                        className="px-2 py-1 rounded-lg border border-[#1a1a1a] hover:border-[#333] hover:bg-[#111] text-sm transition-all active:scale-90">
+                        {e}
+                      </button>
+                    ))}
+                    <button onClick={() => sendReaction('BOO!')}
+                      className="px-2 py-1 rounded-lg border border-[#1a1a1a] hover:border-[#ef4444]/60 hover:bg-[#ef4444]/10 text-[10px] font-black text-[#ef4444]/60 hover:text-[#ef4444] tracking-wider transition-all active:scale-90">
+                      BOO!
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (

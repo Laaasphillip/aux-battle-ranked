@@ -25,3 +25,13 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);   }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-38px) scale(1.25); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-68px) scale(0.85); }
+}
+.reaction-float {
+  animation: floatUp 2.6s ease-out forwards;
+  pointer-events: none;
+}
