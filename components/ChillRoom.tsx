@@ -47,6 +47,143 @@ function getVisitorId(): string {
   return id
 }
 
+// ─── Isometric room constants ────────────────────────────────────────────────
+const COLS = 8
+const ROWS = 6
+const TW   = 52
+const TH   = 26
+const WH   = 44   // wall height above floor in SVG units
+const ISO_VB_W = 400
+const ISO_VB_H = 310
+const OX = 175    // back-corner origin x
+const OY = 68     // back-corner origin y (wall space = WH + padding above)
+
+function isoPos(col: number, row: number, ox: number, oy: number) {
+  return { x: (col - row) * TW / 2 + ox, y: (col + row) * TH / 2 + oy }
+}
+
+function screenToTile(sx: number, sy: number, ox: number, oy: number) {
+  const ix = sx - ox, iy = sy - oy
+  const col = (ix / (TW / 2) + iy / (TH / 2)) / 2
+  const row = (iy / (TH / 2) - ix / (TW / 2)) / 2
+  return {
+    col: Math.max(0, Math.min(COLS - 1, Math.round(col))),
+    row: Math.max(0, Math.min(ROWS - 1, Math.round(row))),
+  }
+}
+
+function tileScreenPos(col: number, row: number) {
+  const iso = isoPos(col + 0.5, row + 0.5, OX, OY)
+  return {
+    left: `${(iso.x / ISO_VB_W) * 100}%`,
+    top:  `${(iso.y / ISO_VB_H) * 100}%`,
+  }
+}
+
+// ─── Habbo-style pixel avatar ─────────────────────────────────────────────────
+function HabboAvatar({ color, name, isMe }: { color: string; name: string; isMe: boolean }) {
+  const bd = '1.5px solid rgba(0,0,0,0.55)'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', filter: `drop-shadow(0 6px 10px ${color}55)` }}>
+      {/* Hair */}
+      <div style={{ width: 22, height: 7, background: color, border: bd, borderBottom: 'none', borderRadius: '4px 4px 0 0', marginBottom: -1 }} />
+      {/* Head */}
+      <div style={{ width: 20, height: 16, background: '#fdd0a0', border: bd, position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 5, left: 2, width: 4, height: 4, background: '#1a1a30' }} />
+        <div style={{ position: 'absolute', top: 5, right: 2, width: 4, height: 4, background: '#1a1a30' }} />
+        <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', width: 8, height: 2, background: 'rgba(180,80,60,0.45)', borderRadius: '0 0 3px 3px' }} />
+      </div>
+      {/* Torso */}
+      <div style={{ width: 24, height: 18, background: color, border: bd, borderTop: 'none', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ height: 7, background: 'rgba(255,255,255,0.2)', borderBottom: '1px solid rgba(0,0,0,0.12)' }} />
+      </div>
+      {/* Legs */}
+      <div style={{ display: 'flex', gap: 2 }}>
+        <div style={{ width: 9, height: 12, background: '#18182e', border: bd, borderTop: 'none' }} />
+        <div style={{ width: 9, height: 12, background: '#18182e', border: bd, borderTop: 'none' }} />
+      </div>
+      {/* Shoes */}
+      <div style={{ display: 'flex', gap: 2, marginTop: 1 }}>
+        <div style={{ width: 11, height: 5, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '0 3px 0 0' }} />
+        <div style={{ width: 11, height: 5, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '3px 0 0 0' }} />
+      </div>
+      {/* Name badge */}
+      <div style={{
+        marginTop: 5, background: isMe ? color : 'rgba(6,6,6,0.9)',
+        border: `1px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'}`,
+        padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap',
+        boxShadow: isMe ? `0 0 12px ${color}80` : 'none',
+      }}>
+        <span style={{ fontSize: 9, color: '#fff', fontWeight: 900, fontFamily: 'ui-monospace,monospace', letterSpacing: '0.5px' }}>
+          {name}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Isometric room SVG ───────────────────────────────────────────────────────
+function IsoRoom() {
+  const floor: React.ReactNode[] = []
+  const leftWall: React.ReactNode[] = []
+  const rightWall: React.ReactNode[] = []
+
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const tl = isoPos(col,   row,   OX, OY)
+      const tr = isoPos(col+1, row,   OX, OY)
+      const br = isoPos(col+1, row+1, OX, OY)
+      const bl = isoPos(col,   row+1, OX, OY)
+      const pts = `${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`
+      const isLight = (col + row) % 2 === 0
+      const isDance = col >= 2 && col <= 5 && row >= 1 && row <= 4
+      const fill = isDance
+        ? (isLight ? '#23204a' : '#1a1840')
+        : (isLight ? '#1b1e3c' : '#131526')
+      floor.push(<polygon key={`t${col}-${row}`} points={pts} fill={fill} stroke='#1e2248' strokeWidth='0.8' />)
+    }
+  }
+
+  for (let row = 0; row < ROWS; row++) {
+    const a = isoPos(0, row,   OX, OY)
+    const b = isoPos(0, row+1, OX, OY)
+    leftWall.push(
+      <polygon key={`lw${row}`}
+        points={`${a.x},${a.y} ${b.x},${b.y} ${b.x},${b.y - WH} ${a.x},${a.y - WH}`}
+        fill='#181b38' stroke='#1e2248' strokeWidth='0.8' />
+    )
+  }
+
+  for (let col = 0; col < COLS; col++) {
+    const a = isoPos(col,   0, OX, OY)
+    const b = isoPos(col+1, 0, OX, OY)
+    rightWall.push(
+      <polygon key={`rw${col}`}
+        points={`${a.x},${a.y} ${b.x},${b.y} ${b.x},${b.y - WH} ${a.x},${a.y - WH}`}
+        fill='#12152c' stroke='#1e2248' strokeWidth='0.8' />
+    )
+  }
+
+  const corner   = isoPos(0,    0,    OX, OY)
+  const leftBot  = isoPos(0,    ROWS, OX, OY)
+  const rightBot = isoPos(COLS, 0,    OX, OY)
+
+  return (
+    <svg viewBox={`0 0 ${ISO_VB_W} ${ISO_VB_H}`} width="100%" height="100%"
+      preserveAspectRatio="none" style={{ display: 'block', position: 'absolute', inset: 0 }}>
+      {leftWall}
+      {rightWall}
+      {floor}
+      {/* Wall top highlight lines */}
+      <line x1={corner.x}   y1={corner.y - WH}   x2={leftBot.x}  y2={leftBot.y - WH}  stroke='#3a3d72' strokeWidth='1.5' />
+      <line x1={corner.x}   y1={corner.y - WH}   x2={rightBot.x} y2={rightBot.y - WH} stroke='#3a3d72' strokeWidth='1.5' />
+      {/* Wall base corner lines */}
+      <line x1={leftBot.x}  y1={leftBot.y - WH}  x2={leftBot.x}  y2={leftBot.y}       stroke='#3a3d72' strokeWidth='1' />
+      <line x1={rightBot.x} y1={rightBot.y - WH} x2={rightBot.x} y2={rightBot.y}      stroke='#3a3d72' strokeWidth='1' />
+    </svg>
+  )
+}
+
 export default function ChillRoom({
   room,
   initialQueue,
@@ -424,8 +561,12 @@ export default function ChillRoom({
 
   function handleWorldClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = Math.min(95, Math.max(5, ((e.clientX - rect.left) / rect.width) * 100))
-    const y = Math.min(93, Math.max(5, ((e.clientY - rect.top) / rect.height) * 100))
+    // Map click to SVG viewBox space (preserveAspectRatio="none" → direct linear mapping)
+    const svgX = (e.clientX - rect.left) / rect.width  * ISO_VB_W
+    const svgY = (e.clientY - rect.top)  / rect.height * ISO_VB_H
+    const { col, row } = screenToTile(svgX, svgY, OX, OY)
+    const x = (col / (COLS - 1)) * 100
+    const y = (row / (ROWS - 1)) * 100
     setMyPos({ x, y })
     setClickTarget({ x, y, t: Date.now() })
     channelRef.current?.track({ username: myName, color: myColor, x, y })
@@ -587,101 +728,74 @@ export default function ChillRoom({
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* 2D World */}
-        <div className="flex-1 relative overflow-hidden" style={{ minWidth: 0 }}>
+        {/* Habbo-style isometric world */}
+        <div className="flex-1 relative overflow-hidden" style={{ minWidth: 0, background: '#0d0e1f' }}>
           {!audioReady && (
             <button
               onClick={enableAudio}
-              className="absolute top-3 left-3 z-10 bg-[#111] border border-[#fbbf24]/40 text-[#fbbf24] text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg hover:bg-[#1a1a1a] transition-colors"
+              className="absolute top-3 left-3 z-20 bg-[#111] border border-[#fbbf24]/40 text-[#fbbf24] text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg hover:bg-[#1a1a1a] transition-colors"
             >
               Tap to enable sound
             </button>
           )}
           <div
             className="w-full h-full cursor-crosshair select-none relative overflow-hidden"
-            style={{ background: '#0c0c0e' }}
             onClick={handleWorldClick}
           >
-            {/* Dot grid overlay */}
-            <div className="absolute inset-0 pointer-events-none" style={{
-              backgroundImage: 'radial-gradient(circle, #1e1e22 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-            }} />
+            {/* Isometric room */}
+            <IsoRoom />
 
-            {/* Ambient corner lights */}
-            <div className="absolute pointer-events-none" style={{ left: '-8%', top: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)' }} />
-            <div className="absolute pointer-events-none" style={{ right: '-8%', top: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%)' }} />
-            <div className="absolute pointer-events-none" style={{ left: '-8%', bottom: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)' }} />
-            <div className="absolute pointer-events-none" style={{ right: '-8%', bottom: '-8%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%)' }} />
+            {/* Click tile ripple */}
+            {clickTarget && (() => {
+              const col = Math.round((clickTarget.x / 100) * (COLS - 1))
+              const row = Math.round((clickTarget.y / 100) * (ROWS - 1))
+              const pos = tileScreenPos(col, row)
+              return (
+                <div key={clickTarget.t} className="absolute pointer-events-none"
+                  style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -50%)', zIndex: 3 }}>
+                  <div className="animate-ping" style={{ width: 44, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.22)' }} />
+                </div>
+              )
+            })()}
 
-            {/* Central dancefloor glow */}
-            <div className="absolute pointer-events-none" style={{
-              left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '30%', height: '30%',
-              background: 'radial-gradient(circle, rgba(239,68,68,0.04) 0%, transparent 70%)',
-              border: '1px solid rgba(255,255,255,0.02)',
-              borderRadius: '50%',
-            }} />
-
-            {/* Click ripple */}
-            {clickTarget && (
-              <div key={clickTarget.t} className="absolute pointer-events-none"
-                style={{ left: `${clickTarget.x}%`, top: `${clickTarget.y}%`, transform: 'translate(-50%, -50%)' }}>
-                <div className="w-8 h-8 rounded-full border border-white/25 animate-ping" />
-              </div>
-            )}
-
-            {/* Other players (from presence) */}
-            {Object.values(players).filter(p => p.id !== myId).map(player => (
-              <div key={player.id} className="absolute pointer-events-none"
-                style={{
-                  left: `${player.x}%`, top: `${player.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  transition: 'left 0.35s ease, top 0.35s ease',
-                  zIndex: 5,
-                }}>
-                <div className="absolute inset-0 rounded-full" style={{ background: player.color, filter: 'blur(8px)', transform: 'scale(1.5)', opacity: 0.3 }} />
-                <div className="w-11 h-11 rounded-full relative mx-auto"
+            {/* Other players */}
+            {Object.values(players).filter(p => p.id !== myId).map(player => {
+              const col = Math.round((player.x / 100) * (COLS - 1))
+              const row = Math.round((player.y / 100) * (ROWS - 1))
+              const pos = tileScreenPos(col, row)
+              return (
+                <div key={player.id} className="absolute pointer-events-none"
                   style={{
-                    background: `radial-gradient(circle at 35% 35%, ${player.color}ee, ${player.color}99)`,
-                    border: '2px solid rgba(255,255,255,0.12)',
-                    boxShadow: `0 4px 14px ${player.color}50`,
+                    left: pos.left, top: pos.top,
+                    transform: 'translate(-50%, -100%)',
+                    transition: 'left 0.35s ease, top 0.35s ease',
+                    zIndex: 5 + col + row,
                   }}>
-                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/25" />
+                  <HabboAvatar color={player.color} name={player.username} isMe={false} />
                 </div>
-                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/70 mx-auto w-fit">
-                  <p className="text-[9px] font-bold text-[#ccc] whitespace-nowrap">{player.username}</p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
 
-            {/* My character (from myPos — instant response) */}
-            {myId && (
-              <div className="absolute pointer-events-none"
-                style={{
-                  left: `${myPos.x}%`, top: `${myPos.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  transition: 'left 0.18s ease, top 0.18s ease',
-                  zIndex: 10,
-                }}>
-                <div className="absolute inset-0 rounded-full" style={{ background: myColor, filter: 'blur(10px)', transform: 'scale(1.6)', opacity: 0.4 }} />
-                <div className="w-11 h-11 rounded-full relative mx-auto"
+            {/* My character */}
+            {myId && (() => {
+              const col = Math.round((myPos.x / 100) * (COLS - 1))
+              const row = Math.round((myPos.y / 100) * (ROWS - 1))
+              const pos = tileScreenPos(col, row)
+              return (
+                <div className="absolute pointer-events-none"
                   style={{
-                    background: `radial-gradient(circle at 35% 35%, ${myColor}ff, ${myColor}bb)`,
-                    border: '2px solid rgba(255,255,255,0.55)',
-                    boxShadow: `0 4px 16px ${myColor}70`,
+                    left: pos.left, top: pos.top,
+                    transform: 'translate(-50%, -100%)',
+                    transition: 'left 0.18s ease, top 0.18s ease',
+                    zIndex: 20 + col + row,
                   }}>
-                  <div className="absolute top-1.5 left-2 w-2 h-1.5 rounded-full bg-white/35" />
+                  <HabboAvatar color={myColor} name={myName} isMe />
                 </div>
-                <div className="mt-1.5 px-1.5 py-0.5 rounded-md bg-black/70 mx-auto w-fit">
-                  <p className="text-[9px] font-bold text-white whitespace-nowrap">{myName} ▪</p>
-                </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
-          <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#1e1e1e] pointer-events-none select-none">
-            Click anywhere to move
+          <p className="absolute bottom-3 left-0 right-0 text-center text-[10px] text-[#22254a] pointer-events-none select-none">
+            Click to move
           </p>
         </div>
 
