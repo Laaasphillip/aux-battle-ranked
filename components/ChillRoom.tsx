@@ -599,7 +599,12 @@ export default function ChillRoom({
   const waitingQueue = queue.filter(q => q.status === 'waiting')
 
   const isSCTrack = !!(currentSong?.track.fullTrackUrl?.includes('soundcloud.com'))
-  const isYTTrack = !!(currentSong?.track.fullTrackUrl?.includes('youtube.com'))
+  // Exclude deprecated listType=search YouTube embeds — they no longer work reliably and
+  // cause songs to advance immediately (onStateChange=0 fires on load error), blocking Deezer.
+  const isYTTrack = !!(
+    currentSong?.track.fullTrackUrl?.includes('youtube.com') &&
+    !currentSong?.track.fullTrackUrl?.includes('listType=search')
+  )
   const isSpotifyTrack = !!(currentSong?.track.spotifyUrl?.includes('open.spotify.com'))
 
   // Restore guest display name from localStorage
@@ -780,14 +785,15 @@ export default function ChillRoom({
     return () => clearInterval(id)
   }, [room.id])
 
-  // Delete room when we are the last player — fires on tab close and internal navigation
+  // Delete room when tab/window actually closes (beforeunload).
+  // Intentionally NOT called on component unmount (internal Next.js navigation) because
+  // the presence sync can race with React's cleanup and report count=1 even when another
+  // user is still in the room — causing premature deletion. Abandoned rooms are cleaned
+  // up by /api/chill/cleanup which runs on every /chill page load.
   useEffect(() => {
     if (!myId) return
 
     const deleteIfEmpty = () => {
-      // Only delete if presence has synced at least once — prevents deleting the room
-      // before the first sync fires (when playerCountRef is still 0) if the component
-      // unmounts during initial connection (e.g. page error, fast navigation).
       if (presenceReadyRef.current && playerCountRef.current <= 1) {
         const blob = new Blob(
           [JSON.stringify({ roomId: room.id })],
@@ -800,7 +806,6 @@ export default function ChillRoom({
     window.addEventListener('beforeunload', deleteIfEmpty)
     return () => {
       window.removeEventListener('beforeunload', deleteIfEmpty)
-      deleteIfEmpty() // also runs on internal Next.js navigation (component unmount)
     }
   }, [myId, room.id])
 
